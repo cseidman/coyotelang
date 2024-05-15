@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "coyote", "coyotec", "cvm",
+]
+resolver = "1"

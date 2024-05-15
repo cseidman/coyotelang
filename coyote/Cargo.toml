@@ -1,0 +1,10 @@
+[package]
+name = "coyote"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rustyline = "14.0.0"
+colored = "2.1.0"
+clap = { version = "4.5.4", features = ["derive"] }
+coyotec = { path = "../coyotec"}
