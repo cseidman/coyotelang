@@ -4,6 +4,7 @@ use rustyline::error::ReadlineError;
 use clap::{Parser};
 use colored::Colorize;
 use coyotec::lexer::{lex, SourceType};
+use coyotec::compiler::compile;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -40,7 +41,7 @@ pub fn run() {
     // Check for file loading
     if let Some(file) = &cli.file {
         println!("Loading file: {}", file);
-        // Add your file loading logic here
+        load_file(file);
     }
 
     // Check if debug mode is enabled
@@ -63,6 +64,10 @@ pub fn run() {
     }
 }
 
+fn load_file(file: &str) {
+    let contents = std::fs::read_to_string(file).unwrap();
+    compile(&contents, SourceType::File(file.to_string()));
+}
 
 fn repl() -> rustyline::Result<()> {
     let mut rl = DefaultEditor::new()?;
@@ -76,7 +81,7 @@ fn repl() -> rustyline::Result<()> {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
                 println!("{} {}", "line:".red(), line.yellow());
-                lex(&line, SourceType::Interactive);
+                compile(&line, SourceType::Interactive);
             },
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");

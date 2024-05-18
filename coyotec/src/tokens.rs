@@ -1,3 +1,4 @@
+#[derive(Clone, PartialOrd, PartialEq, Debug)]
 pub enum TokenType {
     Integer(i64),
     Float(f64),
@@ -15,6 +16,7 @@ pub enum TokenType {
     SemiColon,
     Colon,
     Equal,
+    Assign,
     Plus,
     Minus,
     Star,
@@ -32,14 +34,16 @@ pub enum TokenType {
     Dollar,
     Quote,
     DataType,
+    Identifier,
+    Let,
+    Func,
     EOF,
 }
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Location {
-    line: usize,
-    column: usize,
+    pub(crate) line: usize,
+    pub(crate) column: usize,
 }
-
 impl Location {
     pub fn new() -> Self {
         Self {
@@ -59,9 +63,10 @@ impl Location {
 }
 
 
+#[derive(Debug)]
 pub struct Token {
-    pub(crate) token_type: TokenType,
-    pub(crate) location: Location
+    pub token_type: TokenType,
+    pub location: Location
 }
 
 

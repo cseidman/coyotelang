@@ -1,5 +1,7 @@
+use std::collections::{HashMap};
 use std::iter::Peekable;
 use std::str::Chars;
+use crate::errors::Error;
 use crate::tokens::{Location, Token, TokenType};
 
 pub enum SourceType {
@@ -16,6 +18,7 @@ struct Source<'a> {
 struct Lexer<'a> {
     source: Source<'a>,
     location: Location,
+    error_mode: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -23,12 +26,14 @@ impl<'a> Lexer<'a> {
         Self {
             source,
             location: Location::new(),
+            error_mode: false,
         }
     }
 
-    pub fn advance(&mut self) {
-        self.source.code.next();
+    pub fn advance(&mut self) -> Option<char>{
+        let value = self.source.code.next();
         self.location.increment(1);
+        value
     }
 
     pub fn peek(&mut self) -> Option<&char> {
@@ -90,9 +95,14 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    pub fn report_error(&mut self, err_msg: &str) {
+        self.error_mode = true;
+        println!("{} at line {} position {}", err_msg, self.location.line, self.location.column);
+    }
+
 }
 
-pub fn lex(code: &str, source_type: SourceType) {
+pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>, Error> {
 
     let mut tokens:Vec<Token> = Vec::new();
 
@@ -101,12 +111,12 @@ pub fn lex(code: &str, source_type: SourceType) {
         source_type,
     });
 
-
     while let Some(&c) = lexer.peek() {
 
         // Get rid of whitespace characters
-        while [' ', '\t'].contains(&c) {
+        if [' ', '\t'].contains(&c) {
             lexer.advance();
+            continue;
         }
 
         if c.is_ascii_digit() {
@@ -129,13 +139,11 @@ pub fn lex(code: &str, source_type: SourceType) {
             }
             if is_float {
                 let num:f64 = snum.parse().unwrap();
-                println!("FLOAT IS: {num}");
-                lexer.make_token(TokenType::Float(num));
+                tokens.push(lexer.make_token(TokenType::Float(num)));
                 continue;
             } else {
                 let num:i64 = snum.parse().unwrap();
-                lexer.make_token(TokenType::Integer(num));
-                println!("INTEGER IS: {num}");
+                tokens.push(lexer.make_token(TokenType::Integer(num)));
                 continue;
             }
         }
@@ -151,8 +159,19 @@ pub fn lex(code: &str, source_type: SourceType) {
                     break;
                 }
             }
-            println!("IDENT IS: {ident}");
-            lexer.make_token(TokenType::Text(Box::new(ident)));
+
+            match ident.as_str() {
+                "let" => {
+                    lexer.make_token(TokenType::Let);
+                },
+                "func" => {
+                    lexer.make_token(TokenType::Func);
+                },
+                _ => {
+                    lexer.make_token(TokenType::Text(Box::new(ident)));
+                },
+            }
+            lexer.advance();
             continue;
         }
 
@@ -169,7 +188,14 @@ pub fn lex(code: &str, source_type: SourceType) {
             ',' => TokenType::Comma,
             ';' => TokenType::SemiColon,
             ':' => TokenType::Colon,
-            '=' => TokenType::Equal,
+            '=' => {
+                if *lexer.peek().unwrap_or(&'\0') == '=' {
+                    lexer.advance();
+                    TokenType::Equal
+                } else {
+                    TokenType::Assign
+                }
+            },
             '+' => TokenType::Plus,
             '-' => TokenType::Minus,
             '*' => TokenType::Star,
@@ -184,7 +210,9 @@ pub fn lex(code: &str, source_type: SourceType) {
                             lexer.multi_line_comment();
                             continue;
                         },
-                        _ => {},
+                        _ => {
+                           lexer.make_token(TokenType::Slash);
+                        },
                     }
                 }
                 TokenType::Slash
@@ -203,13 +231,30 @@ pub fn lex(code: &str, source_type: SourceType) {
                 TokenType::Newline
             },
             '$' => TokenType::Dollar,
-            '"' => TokenType::Quote,
+            '"' => {
+                let mut s = String::new();
+                while let Some(&x) = lexer.peek() {
+                    if x == '"' {
+                        break;
+                    }
+                    s.push(x);
+                    lexer.advance();
+                }
+                lexer.advance();
+                TokenType::Text(Box::new(s))
+            },
             _ => {
-                panic!("No goo");
+                let err_msg = format!("Unexpected character: {c}");
+                lexer.report_error(&err_msg);
+                continue;
             }
         };
-
         tokens.push(lexer.make_token(token_type));
     }
+    if lexer.error_mode {
+        return Err(Error::LexerError);
+    }
+    tokens.push(lexer.make_token(TokenType::EOF));
+    Ok(tokens)
 }
 
