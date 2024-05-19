@@ -1,7 +1,7 @@
 use crate::tokens::{Token, TokenType};
 use std::slice::{Iter};
 use std::iter::Peekable;
-use crate::ast::{BinOp, BinOperator, Float, Integer, Visitor};
+use crate::ast::{BinOp, BinOperator, Float, Integer, UnaryOp, UnaryOperator, AstNode};
 
 const PREVIOUS: usize = 0;
 const CURRENT: usize = 1;
@@ -29,7 +29,7 @@ impl<'a> Parser<'a> {
         self.tokens.peek().cloned()
     }
 
-    pub fn parse(&mut self) -> Option<Box<dyn Visitor>> {
+    pub fn parse(&mut self) -> Option<Box<dyn AstNode>> {
         while let Some(token) = self.peek() {
             match token.token_type {
                 /*
@@ -67,7 +67,7 @@ impl<'a> Parser<'a> {
         None
     }
 
-    fn parse_factor(&mut self) -> Option<Box<dyn Visitor>> {
+    fn parse_primary(&mut self) -> Option<Box<dyn AstNode>> {
         if self.match_token(TokenType::LParen) {
             let expr = self.parse_expr()?;
             self.expect_token(TokenType::LParen)?;
@@ -75,7 +75,6 @@ impl<'a> Parser<'a> {
         }
 
         let token = self.peek()?;
-
         macro_rules! make_factor {
             ($type:tt) => {{
                 if let TokenType::$type(value) = token.token_type {
@@ -84,17 +83,26 @@ impl<'a> Parser<'a> {
                 }
             }}
         }
-
         make_factor!(Integer);
         make_factor!(Float);
-
         None
-
     }
 
-    fn parse_term(&mut self) -> Option<Box<dyn Visitor>> {
+    fn parse_unary(&mut self) -> Option<Box<dyn AstNode>> {
+        let token = self.peek()?;
+        let unop = match token.token_type {
+            TokenType::Minus => UnaryOp::Neg,
+            TokenType::Bang => UnaryOp::Not,
+            _ => return self.parse_primary(),
+        };
+        self.advance();
+        let expr = self.parse_expr()?;
+        Some(Box::new(UnaryOperator::new(unop, expr)))
+    }
+
+    fn parse_term(&mut self) -> Option<Box<dyn AstNode>> {
         // First check if the token is a number or grouping token
-        let mut node = self.parse_factor()?;
+        let mut node = self.parse_primary()?;
 
         loop {
             let token = self.peek()?;
@@ -104,14 +112,14 @@ impl<'a> Parser<'a> {
                 _ => break,
             };
             self.advance();
-            let right = self.parse_factor()?;
+            let right = self.parse_primary()?;
             node = Box::new(BinOperator::new(op, node, right));
         }
 
         Some(node)
     }
 
-    fn parse_expr(&mut self) -> Option<Box<dyn Visitor>> {
+    fn parse_expr(&mut self) -> Option<Box<dyn AstNode>> {
         // First check if these is a higher precedence operator
         let mut node = self.parse_term()?;
 
@@ -124,8 +132,7 @@ impl<'a> Parser<'a> {
             };
             self.advance();
             let right = self.parse_term()?;
-            let binoperator = Box::new(BinOperator::new(op, node, right));
-            node = binoperator;
+            node = Box::new(BinOperator::new(op, node, right));
         }
         Some(node)
     }
@@ -144,10 +151,8 @@ impl<'a> Parser<'a> {
 
  */
 
-
-
 }
-pub fn parse(tokens: &Vec<Token>) -> Option<Box<dyn Visitor>> {
+pub fn parse(tokens: &Vec<Token>) -> Option<Box<dyn AstNode>> {
     let mut p = Parser::new(tokens);
     let ast = p.parse();
     ast
