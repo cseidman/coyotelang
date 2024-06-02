@@ -1,35 +1,44 @@
 use crate::tokens::{Token, TokenType};
 use std::slice::{Iter};
 use std::iter::Peekable;
-use crate::ast::{BinOp, BinOperator, Float, Integer, UnaryOp, UnaryOperator, AstNode};
+use crate::ast::{BinOp, UnaryOp, NodeType, Node, DataType};
+use crate::ast::NodeType::*;
+
+use std::borrow::Borrow;
 
 const PREVIOUS: usize = 0;
 const CURRENT: usize = 1;
 
 
 struct Parser<'a> {
-    tokens: Peekable<Iter<'a, Token>>,
+    tokens: Iter<'a, Token>,
     current: usize,
 }
 
 impl<'a> Parser<'a> {
     pub fn new(tokens: &'a Vec<Token>) -> Self {
         Self {
-            tokens: tokens.iter().peekable(),
+            tokens: tokens.iter(),
             current: 0,
         }
     }
 
-    pub fn advance(&mut self) -> Option<&Token> {
+    pub fn advance(&mut self) -> Option<Token> {
         self.current+=1;
-        self.tokens.next()
+        if let Some(token) = self.tokens.next() {
+            return Some(token.clone());
+        }
+        None
     }
 
-    pub fn peek(&mut self) -> Option<&Token> {
-        self.tokens.peek().cloned()
+    pub fn peek(&mut self) -> Option<Token> {
+        if let Some(token ) = self.tokens.clone().next() {
+            return Some(token.clone());
+        }
+        None
     }
 
-    pub fn parse(&mut self) -> Option<Box<dyn AstNode>> {
+    pub fn parse(&mut self) -> Option<Node> {
         while let Some(token) = self.peek() {
             match token.token_type {
                 /*
@@ -58,7 +67,7 @@ impl<'a> Parser<'a> {
         }
         false
     }
-    fn expect_token(&mut self, token_type: TokenType) -> Option<&Token> {
+    fn expect_token(&mut self, token_type: TokenType) -> Option<Token> {
         if let Some(t) = self.peek() {
             if t.token_type == token_type {
                 return self.advance();
@@ -67,28 +76,31 @@ impl<'a> Parser<'a> {
         None
     }
 
-    fn parse_primary(&mut self) -> Option<Box<dyn AstNode>> {
+    fn parse_primary(&mut self) -> Option<Node> {
         if self.match_token(TokenType::LParen) {
             let expr = self.parse_expr()?;
-            self.expect_token(TokenType::LParen)?;
+            self.expect_token(TokenType::RParen)?;
             return Some(expr);
         }
 
         let token = self.peek()?;
-        macro_rules! make_factor {
-            ($type:tt) => {{
-                if let TokenType::$type(value) = token.token_type {
-                    self.advance();
-                    return Some(Box::new($type{value: value}));
-                }
-            }}
+
+        match token.token_type {
+            TokenType::Integer(value) => {
+                self.advance();
+                return Some(Node::new(NodeType::Integer(value), token.location, DataType::Integer));
+            },
+            TokenType::Float(value) => {
+                self.advance();
+                return Some(Node::new(NodeType::Float(value), token.location, DataType::Float));
+            },
+            _ => {
+                return None;
+            }
         }
-        make_factor!(Integer);
-        make_factor!(Float);
-        None
     }
 
-    fn parse_unary(&mut self) -> Option<Box<dyn AstNode>> {
+    fn parse_unary(&mut self) -> Option<Node> {
         let token = self.peek()?;
         let unop = match token.token_type {
             TokenType::Minus => UnaryOp::Neg,
@@ -97,10 +109,10 @@ impl<'a> Parser<'a> {
         };
         self.advance();
         let expr = self.parse_expr()?;
-        Some(Box::new(UnaryOperator::new(unop, expr)))
+        Some(expr)
     }
 
-    fn parse_term(&mut self) -> Option<Box<dyn AstNode>> {
+    fn parse_term(&mut self) -> Option<Node> {
         // First check if the token is a number or grouping token
         let mut node = self.parse_primary()?;
 
@@ -113,26 +125,51 @@ impl<'a> Parser<'a> {
             };
             self.advance();
             let right = self.parse_primary()?;
-            node = Box::new(BinOperator::new(op, node, right));
+
+            let rdata_type = right.data_type;
+            let ldata_type = node.data_type;
+
+            if rdata_type != ldata_type {
+                println!("Type mismatch {:?}, {:?}", rdata_type, ldata_type);
+                return None;
+            }
+
+            let left = node;
+            node = Node::new(BinOperator(op), token.location, rdata_type);
+            node.add_child(right);
+            node.add_child(left);
         }
 
         Some(node)
     }
 
-    fn parse_expr(&mut self) -> Option<Box<dyn AstNode>> {
+    fn parse_expr(&mut self) -> Option<Node> {
         // First check if these is a higher precedence operator
         let mut node = self.parse_term()?;
 
         loop {
-            let token = self.peek()?;
+            let token = self.peek()? ;
+
             let op = match token.token_type {
                 TokenType::Plus => BinOp::Add,
                 TokenType::Minus => BinOp::Sub,
                 _ => break,
             };
             self.advance();
+
             let right = self.parse_term()?;
-            node = Box::new(BinOperator::new(op, node, right));
+            let rdata_type = right.data_type;
+            let ldata_type = node.data_type;
+
+            if rdata_type != ldata_type {
+                println!("Type mismatch {:?}, {:?}", rdata_type, ldata_type);
+                return None;
+            }
+
+            let mut new_node = Node::new(BinOperator(op), token.location, rdata_type);
+            new_node.add_child(right);
+            new_node.add_child(node);
+            node = new_node;
         }
         Some(node)
     }
@@ -152,7 +189,7 @@ impl<'a> Parser<'a> {
  */
 
 }
-pub fn parse(tokens: &Vec<Token>) -> Option<Box<dyn AstNode>> {
+pub fn parse(tokens: &Vec<Token>) -> Option<Node> {
     let mut p = Parser::new(tokens);
     let ast = p.parse();
     ast

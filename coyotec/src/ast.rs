@@ -2,134 +2,91 @@ use std::any::Any;
 use std::fmt::Display;
 use crate::tokens::Location;
 
-pub trait AstNode {
-    fn visit(&self);
-    fn is_term(&self) -> bool {
-        false
-    }
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum DataType {
+    Integer,
+    Float,
+    Boolean,
+    String,
+    Array,
+    Function,
+    None,
 }
 
-pub struct Integer {
-    pub value: i64,
+#[derive(Clone, Copy)]
+pub enum NodeType {
+    Integer(i64),
+    Float(f64),
+    BinOperator(BinOp),
+    UnaryOperator(UnaryOp),
 }
-impl AstNode for Integer {
-    fn visit(&self) {
-        println!("{}", self.value);
-    }
-
-    fn is_term(&self) -> bool {
-       true
-    }
-}
-
-pub struct Float {
-    pub value: f64,
-}
-impl AstNode for crate::ast::Float {
-    fn visit(&self) {
-        println!("{}", self.value);
-    }
-
-    fn is_term(&self) -> bool {
-       true
-    }
-
+#[derive(Clone)]
+pub struct Node {
+    pub node_type: NodeType,
+    pub children: Vec<Node>,
+    pub location: Location,
+    pub data_type: DataType,
 }
 
-pub struct BinOperator {
-    pub op: BinOp,
-    pub lhs: Box<dyn AstNode>,
-    pub rhs: Box<dyn AstNode>,
-}
-
-impl AstNode for BinOperator {
-    fn visit(&self) {
-        self.lhs.visit();
-        self.rhs.visit();
-        println!("{:?}", self.op);
-    }
-}
-
-impl BinOperator {
-    pub fn new(op: BinOp, lhs: Box<dyn AstNode>, rhs: Box<dyn AstNode>) -> Self {
+impl Node {
+    pub fn new(node_type: NodeType, location: Location, return_type: DataType) -> Self {
         Self {
-            op,
-            lhs,
-            rhs,
+            node_type,
+            children: vec![],
+            location,
+            data_type: return_type,
         }
     }
-}
-
-pub struct UnaryOperator {
-    pub op: UnaryOp,
-    pub expr: Box<dyn AstNode>,
-}
-
-impl UnaryOperator {
-    pub fn new(op: UnaryOp, expr: Box<dyn AstNode>) -> Self {
-        Self {
-            op,
-            expr,
-        }
+    pub fn add_child(&mut self, node: Node) {
+        self.children.push(node);
     }
 }
-
-impl AstNode for UnaryOperator {
-    fn visit(&self) {
-        self.expr.visit();
-        println!("{:?}", self.op);
-    }
-
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum BinOp {
     Add,
     Sub,
     Mul,
     Div,
 }
-#[derive(Debug)]
+
+impl BinOp {
+    pub fn op_from_type(&self, data_type: DataType) -> String {
+        match (self, data_type) {
+            (BinOp::Add, DataType::Integer) => "iadd",
+            (BinOp::Sub, DataType::Integer) => "isub",
+            (BinOp::Mul, DataType::Integer) => "imul",
+            (BinOp::Div, DataType::Integer) => "idiv",
+
+            (BinOp::Add, DataType::Float) => "fadd",
+            (BinOp::Sub, DataType::Float) => "fsub",
+            (BinOp::Mul, DataType::Float) => "fmul",
+            (BinOp::Div, DataType::Float) => "fdiv",
+            _ => {
+                panic!("Invalid operation for data type");
+            }
+        }.to_string()
+
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum UnaryOp {
     Neg,
     Not,
 }
+impl Display for UnaryOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            UnaryOp::Neg => write!(f, "neg"),
+            UnaryOp::Not => write!(f, "not"),
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod test {
-    use crate::ast::{BinOperator, Integer, AstNode, BinOp};
-    use crate::tokens::Location;
 
-    #[test]
-    fn test_ast() {
-        let loc = Location::new();
-        let int = Integer { value: 1 };
-        let int2 = Integer { value: 2 };
-        let int3 = Integer { value: 3 };
-        let int4 = Integer { value: 4 };
-
-        let binop = BinOperator {
-            op: BinOp::Mul,
-            lhs: Box::new(int),
-            rhs: Box::new(int2),
-        };
-
-        let sub = BinOperator {
-            op: BinOp::Sub,
-            lhs: Box::new(binop),
-            rhs: Box::new(int4),
-        };
-
-        let add = BinOperator {
-            op: BinOp::Add,
-            lhs: Box::new(sub),
-            rhs: Box::new(int3),
-        };
-        add.visit();
-    }
 }
 
 

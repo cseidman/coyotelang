@@ -63,12 +63,11 @@ impl Location {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub token_type: TokenType,
     pub location: Location
 }
-
 
 #[cfg(test)]
 mod test {

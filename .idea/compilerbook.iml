@@ -5,6 +5,7 @@
       <sourceFolder url="file://$MODULE_DIR$/coyote/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/coyotec/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cvm/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cyasm/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

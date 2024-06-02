@@ -1,5 +1,5 @@
 [workspace]
 members = [
-    "coyote", "coyotec", "cvm",
+    "coyote", "coyotec", "cvm", "cyasm",
 ]
 resolver = "1"

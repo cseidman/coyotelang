@@ -5,6 +5,7 @@ use clap::{Parser};
 use colored::Colorize;
 use coyotec::lexer::{lex, SourceType};
 use coyotec::compiler::compile;
+use cvm::vm;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -81,7 +82,8 @@ fn repl() -> rustyline::Result<()> {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
                 println!("{} {}", "line:".red(), line.yellow());
-                compile(&line, SourceType::Interactive);
+                let bytecode = compile(&line, SourceType::Interactive);
+                vm::execute(bytecode);
             },
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");

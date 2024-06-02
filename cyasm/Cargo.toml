@@ -1,7 +1,6 @@
 [package]
-name = "coyotec"
+name = "cyasm"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-cyasm = {path = "../cyasm"}
