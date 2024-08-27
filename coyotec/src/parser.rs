@@ -5,14 +5,16 @@ use crate::ast::{BinOp, UnaryOp, NodeType, Node, DataType};
 use crate::ast::NodeType::*;
 
 use std::borrow::Borrow;
+use crate::symbols::SymbolNames;
 
 const PREVIOUS: usize = 0;
 const CURRENT: usize = 1;
 
-
+/// The parser takes a vector of tokens and builds the AST
 struct Parser<'a> {
     tokens: Iter<'a, Token>,
-    current: usize,
+    current: usize, // The current token position being parsed
+    symbol_names: SymbolNames // A map of symbol names to location numbers
 }
 
 impl<'a> Parser<'a> {
@@ -20,9 +22,11 @@ impl<'a> Parser<'a> {
         Self {
             tokens: tokens.iter(),
             current: 0,
+            symbol_names: SymbolNames::new(),
         }
     }
-
+    /// Advance the token iterator and return the next token. If there are no more tokens
+    /// return `None`
     pub fn advance(&mut self) -> Option<Token> {
         self.current+=1;
         if let Some(token) = self.tokens.next() {
@@ -30,10 +34,88 @@ impl<'a> Parser<'a> {
         }
         None
     }
-
+    /// Peek at the next token without advancing the iterator
     pub fn peek(&mut self) -> Option<Token> {
+        /// We need to clone the token because so as not to advance the token
+        /// iterator on the "real" vector of tokens
         if let Some(token ) = self.tokens.clone().next() {
             return Some(token.clone());
+        }
+        None
+    }
+
+    fn parse_let(&mut self) -> Option<Node> {
+        self.expect_token(TokenType::Let)?;
+        let mut node = Node::new(Let, self.peek()?.location, DataType::None);
+
+        let id_node = self.parse_identifier()?;
+        node.add_child(id_node);
+        Some(node)
+    }
+
+
+    fn parse_identifier(&mut self) -> Option<Node> {
+        let token = self.advance()?;
+        if let TokenType::Identifier(name) = token.token_type {
+            let ident_id = self.symbol_names.get(&name);
+            let mut node = Node::new(Identifier(ident_id), token.location, DataType::None);
+            let next_token = self.peek()?;
+
+            // A colon indicates that the data type is specified
+            if next_token.token_type == TokenType::Colon {
+
+                self.advance();
+                let data_def = self.advance()?;
+
+                node.data_type = match data_def.token_type {
+
+                    TokenType::DataType => {
+                        match data_def.token_type {
+                            TokenType::Integer(_) => DataType::Integer,
+                            TokenType::Float(_) => DataType::Float,
+                            TokenType::Text(_) => DataType::String,
+                            TokenType::Boolean(_) => DataType::Boolean,
+                            TokenType::Struct(name) => {
+                                let ident = self.symbol_names.get(&name);
+                                DataType::Struct(ident)
+                            },
+                            _ => DataType::None,
+                        }
+                    },
+                    _ => DataType::None,
+                };
+            }
+
+            // If the type wasn't specified then the data type MUST be inferred from the
+            // assign
+
+            match next_token.token_type {
+
+                TokenType::Equal => {
+                    self.advance();
+                    let expr = self.parse_expr()?;
+                    // Edge case. If the data type was specified then the expression must match
+                    if node.data_type != DataType::None && node.data_type != expr.data_type {
+                        println!("Type mismatch {:?}, {:?}", node.data_type, expr.data_type);
+                        return None;
+                    }
+                    // If not, the node infers the datatype from the expression
+                    node.data_type = expr.data_type;
+                    node.add_child(expr);
+                },
+                _ => {
+                    node.data_type = DataType::None;
+                }
+            }
+
+            // Final check: we must have a data type assigned to this node. If not, it's because
+            // the data type was not specified and the expression was not parsed
+            if node.data_type == DataType::None {
+                println!("Data type not assigned to identifier");
+                return None;
+            }
+
+            return Some(node);
         }
         None
     }
@@ -41,10 +123,11 @@ impl<'a> Parser<'a> {
     pub fn parse(&mut self) -> Option<Node> {
         while let Some(token) = self.peek() {
             match token.token_type {
-                /*
+
                 TokenType::Let => {
-                    self.parse_let()
+                    return self.parse_let()
                 }
+                /*
                 TokenType::Identifier => {
                     self.parse_identifier()
                 }
@@ -126,8 +209,8 @@ impl<'a> Parser<'a> {
             self.advance();
             let right = self.parse_primary()?;
 
-            let rdata_type = right.data_type;
-            let ldata_type = node.data_type;
+            let rdata_type = right.clone().data_type;
+            let ldata_type = node.clone().data_type;
 
             if rdata_type != ldata_type {
                 println!("Type mismatch {:?}, {:?}", rdata_type, ldata_type);
@@ -158,8 +241,8 @@ impl<'a> Parser<'a> {
             self.advance();
 
             let right = self.parse_term()?;
-            let rdata_type = right.data_type;
-            let ldata_type = node.data_type;
+            let rdata_type = right.clone().data_type;
+            let ldata_type = node.clone().data_type;
 
             if rdata_type != ldata_type {
                 println!("Type mismatch {:?}, {:?}", rdata_type, ldata_type);

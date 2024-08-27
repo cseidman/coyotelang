@@ -2,7 +2,7 @@ use std::any::Any;
 use std::fmt::Display;
 use crate::tokens::Location;
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum DataType {
     Integer,
     Float,
@@ -10,6 +10,7 @@ pub enum DataType {
     String,
     Array,
     Function,
+    Struct(usize),
     None,
 }
 
@@ -19,6 +20,8 @@ pub enum NodeType {
     Float(f64),
     BinOperator(BinOp),
     UnaryOperator(UnaryOp),
+    Identifier(usize), // Refers to a symbol table entry
+    Let,
 }
 #[derive(Clone)]
 pub struct Node {

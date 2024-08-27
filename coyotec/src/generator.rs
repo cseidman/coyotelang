@@ -23,7 +23,7 @@ impl Generator {
     pub fn generate(&mut self, node: &Node, asm: &mut String) {
         match node.node_type.clone() {
             BinOperator(op) => {
-                let data_type = node.data_type;
+                let data_type = node.data_type.clone();
                 for child in &node.children {
                     self.generate(child, asm);
                 }
@@ -39,7 +39,10 @@ impl Generator {
                 self.cur_reg +=1;
             },
             Float(value) => {
-                println!("{value}");
+                let reg = self.cur_reg;
+                write(asm,format_args!("fmov %r{reg}, {value} ;")).expect("Error writing to asm");
+                self.cur_reg +=1;
+
             },
             _ => {
                 println!("Code generation not implemented for this node");

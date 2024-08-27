@@ -41,6 +41,11 @@ const ISUB :u8 = 3;
 const IMUL :u8 = 4;
 const IDIV :u8 = 5;
 const IEQU :u8 = 6;
+const FMOV :u8 = 7;
+const FADD :u8 = 8;
+const FSUB :u8 = 9;
+const FMUL :u8 = 10;
+const FDIV :u8 = 11;
 
 impl Vm {
     pub fn new() -> Self {
@@ -89,9 +94,20 @@ impl Vm {
                 let reg1 = self.get_register_location();
                 let reg2 = self.get_register_location();
 
-                let lval = self.registers[reg1].as_integer();
-                let rval = self.registers[reg2].as_integer();
+                let rval = self.registers[reg1].as_integer();
+                let lval = self.registers[reg2].as_integer();
                 self.registers[reg1].i = lval $op rval;
+            };
+        }
+
+        macro_rules! fbinop {
+            ($op:tt) => {
+                let reg1 = self.get_register_location();
+                let reg2 = self.get_register_location();
+
+                let rval = self.registers[reg1].as_float();
+                let lval = self.registers[reg2].as_float();
+                self.registers[reg1].f = lval $op rval;
             };
         }
 
@@ -103,12 +119,42 @@ impl Vm {
                     let reg = self.get_register_location();
                     let value = self.get_data().as_integer();
                     self.registers[reg].i = value;
+                    //print!("imov {}, {}\t", reg, value);
                 },
-                IADD => {ibinop!(+);},
-                ISUB => {ibinop!(-);},
-                IMUL => {ibinop!(*);},
-                IDIV => {ibinop!(/);},
+                FMOV => {
+                    let reg = self.get_register_location();
+                    let value = self.get_data().as_float();
+                    self.registers[reg].f = value;
+                    //print!("imov {}, {}\t", reg, value);
+                },
+                IADD => {
+                    ibinop!(+);
+                },
+                FADD => {
+                    fbinop!(+);
+                },
+                ISUB => {
+                    ibinop!(-);
+                },
+                FSUB => {
+                    fbinop!(-);
+                },
+                IMUL => {
+                    ibinop!(*);
+
+                },
+                FMUL => {
+                    fbinop!(*);
+
+                },
+                IDIV => {
+                    ibinop!(/);
+                },
+                FDIV => {
+                    fbinop!(/);
+                },
                 HALT => {
+                    //println!("HALT\t");
                     break;
                 },
                 _ => {
@@ -116,7 +162,12 @@ impl Vm {
                     break;
                 }
             }
+            //for i in 0..5 {
+            //    print!("[{}]\t", self.registers[i].as_integer());
+            //}
+            //println!();
         }
+        println!("{}", self.registers[0].as_float());
     }
 }
 
@@ -124,9 +175,6 @@ pub fn execute(bytecode: Vec<u8>) {
     let mut vm = Vm::new();
     vm.code = bytecode;
     vm.run();
-    for i in 0..4 {
-        println!("Register {}: {:?}", i, vm.registers[i].as_integer());
-    }
 }
 
 #[cfg(test)]
@@ -158,9 +206,10 @@ mod test {
             0,
         ];
         vm.run();
-        for i in 0..4 {
-            println!("Register {}: {:?}", i, vm.registers[i].as_integer());
-        }
+        //for i in 0..4 {
+        //    println!("Register {}: {:?}", i, vm.registers[i].as_integer());
+        //}
+        println!("{}", vm.registers[0].as_integer());
         assert_eq!(vm.registers[0].as_integer(), 11);
 
     }

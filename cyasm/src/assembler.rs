@@ -32,7 +32,7 @@ impl<'a> Parser<'a> {
     pub fn make_number_string(&mut self) -> String {
         let mut s = String::new();
         while let Some(&d) = self.asm.peek() {
-            if d.is_numeric() {
+            if d.is_numeric() || d == '.' {
                 s.push(d);
                 self.advance();
             } else {
@@ -83,8 +83,13 @@ impl<'a> Parser<'a> {
 
             if c.is_ascii_digit() {
                 let s = self.make_number_string();
-                let num = s.parse::<i64>().unwrap();
-                self.emit_operand(num.to_le_bytes());
+                let num:[u8;8];
+                if s.contains('.') {
+                    num = s.parse::<f64>().unwrap().to_le_bytes();
+                } else {
+                    num = s.parse::<i64>().unwrap().to_le_bytes();
+                }
+                self.emit_operand(num);
                 continue;
             }
 
@@ -135,9 +140,14 @@ impl<'a> Parser<'a> {
             "imul" => Some(4),
             "idiv" => Some(5),
             "iequ" => Some(6),
-            "cmp" => Some(7),
-            "iinc" => Some(8),
-            "idec" => Some(9),
+            "fmov" => Some(7),
+            "fadd" => Some(8),
+            "fsub" => Some(9),
+            "fmul" => Some(10),
+            "fdiv" => Some(11),
+            "idec" => Some(12),
+            "cmp" => Some(13),
+            "iinc" => Some(14),
             _ => None,
         }
     }
