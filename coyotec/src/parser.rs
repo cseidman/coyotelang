@@ -1,28 +1,31 @@
+#![allow(dead_code, unused_variables)]
+/// The parser takes a vector of tokens from the lexer and builds the AST
+///
+/// The parser is a recursive descent parser that builds the AST from the tokens
 use crate::tokens::{Token, TokenType};
 use std::slice::{Iter};
-use std::iter::Peekable;
-use crate::ast::{BinOp, UnaryOp, NodeType, Node, DataType};
-use crate::ast::NodeType::*;
+use crate::ast::{BinOp, UnaryOp, ValueType, Node, DataType};
+use crate::ast::ValueType::*;
+use anyhow::Result;
 
-use std::borrow::Borrow;
-use crate::symbols::SymbolNames;
+use crate::symbols::{SymbolTable};
 
 const PREVIOUS: usize = 0;
 const CURRENT: usize = 1;
 
-/// The parser takes a vector of tokens and builds the AST
 struct Parser<'a> {
     tokens: Iter<'a, Token>,
     current: usize, // The current token position being parsed
-    symbol_names: SymbolNames // A map of symbol names to location numbers
+    symbol_table: SymbolTable // A map of symbol names to location numbers
 }
 
 impl<'a> Parser<'a> {
     pub fn new(tokens: &'a Vec<Token>) -> Self {
         Self {
+            // Iterators are used to avoid moving the vector of tokens
             tokens: tokens.iter(),
             current: 0,
-            symbol_names: SymbolNames::new(),
+            symbol_table: SymbolTable::new(),
         }
     }
     /// Advance the token iterator and return the next token. If there are no more tokens
@@ -36,29 +39,35 @@ impl<'a> Parser<'a> {
     }
     /// Peek at the next token without advancing the iterator
     pub fn peek(&mut self) -> Option<Token> {
-        /// We need to clone the token because so as not to advance the token
-        /// iterator on the "real" vector of tokens
+        // We need to clone the token because so as not to advance the token
+        // iterator on the "real" vector of tokens
         if let Some(token ) = self.tokens.clone().next() {
             return Some(token.clone());
         }
         None
     }
-
+    /// Parse a `let` statement
     fn parse_let(&mut self) -> Option<Node> {
+        // Expect a `let` token or send back an error
         self.expect_token(TokenType::Let)?;
+
+        // Create a new node from the `let` token
         let mut node = Node::new(Let, self.peek()?.location, DataType::None);
 
+        // Parse the identifier and make another child node from it
         let id_node = self.parse_identifier()?;
         node.add_child(id_node);
         Some(node)
     }
 
-
+    /// Parse an identifier into a node
+    ///
+    ///
     fn parse_identifier(&mut self) -> Option<Node> {
         let token = self.advance()?;
         if let TokenType::Identifier(name) = token.token_type {
-            let ident_id = self.symbol_names.get(&name);
-            let mut node = Node::new(Identifier(ident_id), token.location, DataType::None);
+            let ident_id = self.symbol_table.get(&name);
+            let mut node = Node::new(Identifier, token.location, DataType::None);
             let next_token = self.peek()?;
 
             // A colon indicates that the data type is specified
@@ -76,7 +85,7 @@ impl<'a> Parser<'a> {
                             TokenType::Text(_) => DataType::String,
                             TokenType::Boolean(_) => DataType::Boolean,
                             TokenType::Struct(name) => {
-                                let ident = self.symbol_names.get(&name);
+                                let ident = self.symbol_table.get(&name);
                                 DataType::Struct(ident)
                             },
                             _ => DataType::None,
@@ -171,11 +180,11 @@ impl<'a> Parser<'a> {
         match token.token_type {
             TokenType::Integer(value) => {
                 self.advance();
-                return Some(Node::new(NodeType::Integer(value), token.location, DataType::Integer));
+                return Some(Node::new(ValueType::Integer(value), token.location, DataType::Integer));
             },
             TokenType::Float(value) => {
                 self.advance();
-                return Some(Node::new(NodeType::Float(value), token.location, DataType::Float));
+                return Some(Node::new(ValueType::Float(value), token.location, DataType::Float));
             },
             _ => {
                 return None;
@@ -227,7 +236,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expr(&mut self) -> Option<Node> {
-        // First check if these is a higher precedence operator
+        // First check if there is a higher precedence operator
         let mut node = self.parse_term()?;
 
         loop {

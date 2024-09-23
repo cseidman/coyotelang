@@ -1,8 +1,14 @@
+#![allow(dead_code, unused_variables)]
 /// Register allocator using the Graph Coloring Algorithm
 
-type LiveRange = (usize, usize);
+pub struct Registers {
+    stack: Vec<usize>,
+    start_window: usize,
+}
 
-pub fn alocate_registers() {
+
+
+pub fn allocate_register() {
 
 
 }

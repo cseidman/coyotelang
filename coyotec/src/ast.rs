@@ -1,5 +1,5 @@
-use std::any::Any;
-use std::fmt::Display;
+#![allow(dead_code, unused_variables)]
+use std::fmt::{Display, Formatter};
 use crate::tokens::Location;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -15,26 +15,40 @@ pub enum DataType {
 }
 
 #[derive(Clone, Copy)]
-pub enum NodeType {
+pub enum ValueType {
     Integer(i64),
     Float(f64),
     BinOperator(BinOp),
     UnaryOperator(UnaryOp),
-    Identifier(usize), // Refers to a symbol table entry
+    Identifier,
     Let,
 }
+
+impl Display for ValueType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ValueType::Integer(value) => {write!(f, "{value}")}
+            ValueType::Float(value) => {write!(f, "{value}")}
+            ValueType::BinOperator(value) => {write!(f, "{value}")}
+            ValueType::UnaryOperator(value) => {write!(f, "{value}")}
+            ValueType::Identifier => {write!(f, "Identifier")}
+            ValueType::Let => {write!(f, "Let")}
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Node {
-    pub node_type: NodeType,
+    pub value_type: ValueType,
     pub children: Vec<Node>,
     pub location: Location,
     pub data_type: DataType,
 }
 
 impl Node {
-    pub fn new(node_type: NodeType, location: Location, return_type: DataType) -> Self {
+    pub fn new(node_type: ValueType, location: Location, return_type: DataType) -> Self {
         Self {
-            node_type,
+            value_type: node_type,
             children: vec![],
             location,
             data_type: return_type,
@@ -52,27 +66,18 @@ pub enum BinOp {
     Div,
 }
 
-impl BinOp {
-    pub fn op_from_type(&self, data_type: DataType) -> String {
-        match (self, data_type) {
-            (BinOp::Add, DataType::Integer) => "iadd",
-            (BinOp::Sub, DataType::Integer) => "isub",
-            (BinOp::Mul, DataType::Integer) => "imul",
-            (BinOp::Div, DataType::Integer) => "idiv",
-
-            (BinOp::Add, DataType::Float) => "fadd",
-            (BinOp::Sub, DataType::Float) => "fsub",
-            (BinOp::Mul, DataType::Float) => "fmul",
-            (BinOp::Div, DataType::Float) => "fdiv",
-            _ => {
-                panic!("Invalid operation for data type");
-            }
-        }.to_string()
-
+impl Display for BinOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            BinOp::Add => write!(f, "add"),
+            BinOp::Sub => write!(f, "sub"),
+            BinOp::Mul => write!(f, "mul"),
+            BinOp::Div => write!(f, "div"),
+        }
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOp {
     Neg,
     Not,

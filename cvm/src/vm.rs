@@ -1,4 +1,4 @@
-
+#![allow(dead_code)]
 #[derive(Copy, Clone)]
 union Value {
     i: i64,

@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 rustyline = "14.0.0"
 colored = "2.1.0"
-clap = { version = "4.5.4", features = ["derive"] }
+clap = { version = "4.5.18", features = ["derive"] }
 coyotec = { path = "../coyotec"}
 cvm = { path = "../cvm"}
+anyhow = "1.0.89"

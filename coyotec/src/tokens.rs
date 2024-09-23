@@ -59,7 +59,7 @@ impl Location {
     }
 
     pub fn increment(&mut self, by: usize) {
-        self.column+=1;
+        self.column+=by;
     }
 }
 

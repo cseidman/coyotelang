@@ -1,9 +1,10 @@
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
+use anyhow::Result;
 
 use clap::{Parser};
 use colored::Colorize;
-use coyotec::lexer::{lex, SourceType};
+use coyotec::lexer::{SourceType};
 use coyotec::compiler::compile;
 use cvm::vm;
 
@@ -36,13 +37,13 @@ struct Cli {
     bytecode: bool,
 }
 
-pub fn run() {
+pub fn run() -> Result<()> {
     let cli = Cli::parse();
 
     // Check for file loading
     if let Some(file) = &cli.file {
         println!("Loading file: {}", file);
-        load_file(file);
+        load_file(file)?;
     }
 
     // Check if debug mode is enabled
@@ -60,19 +61,19 @@ pub fn run() {
     // If no flags are provided, launch REPL
     if cli.file.is_none() && !cli.debug && !cli.bytecode {
         println!("Launching REPL...");
-        repl().unwrap();
+        return Ok(repl()?);
         // Add your REPL launching logic here
     }
+    Ok(())
 }
 
-fn load_file(file: &str) {
+fn load_file(file: &str) -> Result<Vec<u8>> {
     let contents = std::fs::read_to_string(file).unwrap();
-    compile(&contents, SourceType::File(file.to_string()));
+    compile(&contents, SourceType::File(file.to_string()))
 }
 
-fn repl() -> rustyline::Result<()> {
+fn repl() -> Result<()> {
     let mut rl = DefaultEditor::new()?;
-    #[cfg(feature = "with-file-history")]
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
     }
@@ -80,10 +81,11 @@ fn repl() -> rustyline::Result<()> {
         let readline = rl.readline(">> ");
         match readline {
             Ok(line) => {
-                rl.add_history_entry(line.as_str());
+                rl.add_history_entry(line.as_str())?;
                 println!("{} {}", "line:".red(), line.yellow());
-                let bytecode = compile(&line, SourceType::Interactive);
-                vm::execute(bytecode);
+                if let Ok(bytecode) = compile(&line, SourceType::Interactive) {
+                    vm::execute(bytecode);
+                }
             },
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");
@@ -99,7 +101,6 @@ fn repl() -> rustyline::Result<()> {
             }
         }
     }
-    #[cfg(feature = "with-file-history")]
-    rl.save_history("history.txt");
+    rl.save_history("history.txt")?;
     Ok(())
 }

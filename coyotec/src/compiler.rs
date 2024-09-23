@@ -1,22 +1,32 @@
+use anyhow::{bail, Result};
 use crate::lexer::{lex, SourceType};
 use crate::parser::parse;
 use crate::generator::generate;
 use cyasm::assembler::assemble;
 
-pub fn compile(code:&str, source_type:SourceType) -> Vec<u8> {
+/// The compiler module is the entry point for the compiler. It takes a string of code
+/// and returns a vector of bytes that represent the compiled code.
+pub fn compile(code:&str, source_type:SourceType) -> Result<Vec<u8>> {
+    // Empty vector to hold the compiled bytecode
     let mut bytecode = Vec::new();
+    // Lex the code
     if let Ok(tokens) = lex(code, source_type) {
-
+        // Parse the tokens
         if let Some(node) = parse(&tokens) {
+            // Generate the assembly code
             let mut asm = String::new();
             generate(&node, &mut asm);
-            bytecode = assemble(&asm);
 
+            println!("Generated asm...");
+            println!("{}", asm);
+
+            // Assemble the assembly code into bytecode
+            bytecode = assemble(&asm);
         } else {
-            panic!("Error parsing");
+           bail!("Error parsing");
         }
     }
-    bytecode
+    Ok(bytecode)
 }
 
 #[cfg(test)]

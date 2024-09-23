@@ -1,8 +1,8 @@
-use std::collections::{HashMap};
+#![allow(dead_code, unused_variables)]
 use std::iter::Peekable;
 use std::str::Chars;
-use crate::errors::Error;
 use crate::tokens::{Location, Token, TokenType};
+use anyhow::{anyhow, Context, Result};
 
 pub enum SourceType {
     Interactive,
@@ -100,9 +100,14 @@ impl<'a> Lexer<'a> {
         println!("{} at line {} position {}", err_msg, self.location.line, self.location.column);
     }
 
+    fn make_error(&mut self, err_msg: &str) -> anyhow::Error {
+        self.error_mode = true;
+        anyhow!("{} at line {} position {}", err_msg, self.location.line, self.location.column)
+    }
+
 }
 
-pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>, Error> {
+pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
 
     let mut tokens:Vec<Token> = Vec::new();
 
@@ -252,7 +257,7 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>, Error> {
         tokens.push(lexer.make_token(token_type));
     }
     if lexer.error_mode {
-        return Err(Error::LexerError);
+        return Err(lexer.make_error("Lexer error"));
     }
     tokens.push(lexer.make_token(TokenType::EOF));
     Ok(tokens)
