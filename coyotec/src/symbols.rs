@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 // This is a map of identifier names to a unique number. The names in here are not scoped
 // nor do the numbers have any meaning other than being unique. This is a way to avoid carrying
 // strings in emums and avoiding clones

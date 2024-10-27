@@ -1,19 +1,7 @@
 #![allow(dead_code)]
+use cvm::constants::*;
 use std::iter::Peekable;
 use std::str::Chars;
-
-enum Instruction {
-    IMov,
-    IAdd,
-    ISub,
-    IMul,
-    IDiv,
-    Equ,
-    Cmp,
-    IInc,
-    IDec,
-}
-
 
 struct Parser<'a> {
     asm: Peekable<Chars<'a>>,
@@ -32,6 +20,7 @@ impl<'a> Parser<'a> {
 
     pub fn make_number_string(&mut self) -> String {
         let mut s = String::new();
+
         while let Some(&d) = self.asm.peek() {
             if d.is_numeric() || d == '.' {
                 s.push(d);
@@ -48,12 +37,10 @@ impl<'a> Parser<'a> {
     }
 
     pub fn assemble(&mut self) -> Vec<u8> {
-
         while let Some(&c) = self.asm.peek() {
-
             if c == '\n' {
                 self.advance();
-                self.line+=1;
+                self.line += 1;
                 continue;
             }
 
@@ -79,17 +66,16 @@ impl<'a> Parser<'a> {
                     self.emit_command(byte);
                     continue;
                 }
-
             }
 
             if c.is_ascii_digit() {
                 let s = self.make_number_string();
-                let num:[u8;8];
-                if s.contains('.') {
-                    num = s.parse::<f64>().unwrap().to_le_bytes();
+
+                let num = if s.contains('.') {
+                    s.parse::<f64>().unwrap().to_le_bytes()
                 } else {
-                    num = s.parse::<i64>().unwrap().to_le_bytes();
-                }
+                    s.parse::<i64>().unwrap().to_le_bytes()
+                };
                 self.emit_operand(num);
                 continue;
             }
@@ -103,16 +89,15 @@ impl<'a> Parser<'a> {
                             'r' | 'm' => {
                                 let s = self.make_number_string();
                                 self.emit_register(s.parse::<u16>().unwrap());
-                            },
+                            }
                             _ => {
                                 panic!("Invalid character: {}", chr);
                             }
                         }
                     }
-
-                },
+                }
                 _ => {
-                    println!("Parsing character: {}", c);
+                    //println!("Parsing character: {}", c);
                 }
             }
         }
@@ -124,7 +109,7 @@ impl<'a> Parser<'a> {
         self.bytecode.push(code);
     }
 
-    fn emit_operand(&mut self, operand: [u8;8]) {
+    fn emit_operand(&mut self, operand: [u8; 8]) {
         self.bytecode.append(&mut operand.to_vec());
     }
 
@@ -135,20 +120,23 @@ impl<'a> Parser<'a> {
 
     fn match_keyword(&self, keyword: String) -> Option<u8> {
         match keyword.as_str() {
-            "imov" => Some(1),
-            "iadd" => Some(2),
-            "isub" => Some(3),
-            "imul" => Some(4),
-            "idiv" => Some(5),
-            "iequ" => Some(6),
-            "fmov" => Some(7),
-            "fadd" => Some(8),
-            "fsub" => Some(9),
-            "fmul" => Some(10),
-            "fdiv" => Some(11),
-            "idec" => Some(12),
-            "cmp" => Some(13),
-            "iinc" => Some(14),
+            "imov" => Some(IMOV),
+            "iadd" => Some(IADD),
+            "isub" => Some(ISUB),
+            "imul" => Some(IMUL),
+            "idiv" => Some(IDIV),
+            "iequ" => Some(IEQU),
+            "fmov" => Some(FMOV),
+            "fadd" => Some(FADD),
+            "fsub" => Some(FSUB),
+            "fmul" => Some(FMUL),
+            "fdiv" => Some(FDIV),
+            "idec" => Some(IDEC),
+            "cmp" => Some(CMP),
+            "iinc" => Some(IINC),
+            "store" => Some(STORE),
+            "istore" => Some(ISTORE),
+            "load" => Some(LOAD),
             _ => None,
         }
     }
@@ -183,31 +171,16 @@ mod test {
         imov %r2, 1 ;
         iadd %r1, %r2 ;
         iadd %r0, %r1 ;
+        store %r3, %r0 ;
+        istore %r4, 3 ;
         "#;
         let mut parser = Parser::new(asm);
         let byte_code = parser.assemble();
         let expected = vec![
-            1,
-            0, 0,
-            4, 0, 0, 0, 0, 0, 0, 0,
-            1,
-            1, 0,
-            3, 0, 0, 0, 0, 0, 0, 0,
-            1,
-            2, 0,
-            2, 0, 0, 0, 0, 0, 0, 0,
-            4,
-            1, 0, 2, 0,
-            1,
-            2, 0,
-            1, 0, 0, 0, 0, 0, 0, 0,
-            2,
-            1, 0, 2, 0,
-            2,
-            0, 0, 1, 0,
-            0
+            IMOV, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, IMOV, 1, 0, 3, 0, 0, 0, 0, 0, 0, 0, IMOV, 2, 0, 2,
+            0, 0, 0, 0, 0, 0, 0, IMUL, 1, 0, 2, 0, IMOV, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, IADD, 1, 0,
+            2, 0, IADD, 0, 0, 1, 0, STORE, 3, 0, 0, 0, ISTORE, 4, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0,
         ];
         assert_eq!(byte_code, expected);
-
     }
 }

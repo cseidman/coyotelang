@@ -1,6 +1,8 @@
 mod cli;
 
 fn main() {
-    cli::run().expect("Failed to run CLI");
+    if let Err(e) = cli::run() {
+        println!("Error: {}", e);
+    }
 }
 

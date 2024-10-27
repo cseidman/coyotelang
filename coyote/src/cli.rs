@@ -1,3 +1,4 @@
+#![allow(unused_variables)]
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
 use anyhow::Result;
@@ -61,14 +62,14 @@ pub fn run() -> Result<()> {
     // If no flags are provided, launch REPL
     if cli.file.is_none() && !cli.debug && !cli.bytecode {
         println!("Launching REPL...");
-        return Ok(repl()?);
+        repl()?;
         // Add your REPL launching logic here
     }
     Ok(())
 }
 
 fn load_file(file: &str) -> Result<Vec<u8>> {
-    let contents = std::fs::read_to_string(file).unwrap();
+    let contents = std::fs::read_to_string(file)?;
     compile(&contents, SourceType::File(file.to_string()))
 }
 

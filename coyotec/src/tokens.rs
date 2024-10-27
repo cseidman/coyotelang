@@ -45,6 +45,14 @@ pub struct Location {
     pub(crate) line: usize,
     pub(crate) column: usize,
 }
+
+impl Default for Location {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 impl Location {
     pub fn new() -> Self {
         Self {

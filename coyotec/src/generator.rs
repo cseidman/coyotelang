@@ -1,145 +1,205 @@
+//! Reads the AST and generates IR in SSA form
 #![allow(dead_code, unused_variables)]
-use crate::ast::{BinOp, DataType, Node, UnaryOp, ValueType};
-use crate::ast::ValueType::*;
 
-type DReg = Option<usize>;
-type SReg = Option<usize>;
+use crate::allocator::Registers;
+use crate::ast::tree::{BinOp, Node, NodeType, UnaryOp, ValueType};
 
-enum Instruction {
-    Mov(DataType, DReg, ValueType),
-    Add(DataType, DReg, SReg),
-    Sub(DataType, DReg, SReg),
-    Mul(DataType, DReg, SReg),
-    Div(DataType, DReg, SReg),
-    Load(DataType, DReg, SReg),
-    Store(DataType, DReg, ValueType),
-    Neg(DataType, DReg),
-    Halt,
+/// These are the instructions that the IR will have
+/// The IR will be in SSA form
+
+struct IrGenerator {
+    registers: Registers,
+    instructions: Vec<String>,
+    tmp_regs: Vec<usize>,
 }
 
-const REG_SIZE: usize = 64000  ;
-type Register = [Option<u8>; 8];
-
-pub struct Generator {
-    registers: [Register; REG_SIZE],
-    instructions: Vec<Instruction>,
-    cur_reg: Option<usize>,
+pub fn generate(node: &Node) -> Vec<String> {
+    let mut generator = IrGenerator::new(node);
+    generator.generate(node);
+    generator.instructions
 }
 
-impl Generator {
-    pub fn new() -> Self {
+impl IrGenerator {
+    pub fn new(node: &Node) -> Self {
         Self {
-            registers: [[None;8];REG_SIZE],
+            registers: Registers::new(1024000),
             instructions: Vec::new(),
-            cur_reg: None,
+            tmp_regs: Vec::new(),
         }
     }
 
-    fn to_asm(&self, asm: &mut String) {
-        for instr in &self.instructions {
-            match instr {
-                Instruction::Mov(data_type, reg, value) => {
-                    match value {
-                        Integer(value) => {
-                            asm.push_str(&format!("mov {}, {}\n", reg.unwrap_or(0), value));
-                        },
-                        Float(value) => {
-                            asm.push_str(&format!("mov {}, {}\n", reg.unwrap_or(0), value));
-                        },
-                        _ => {}
+    fn push(&mut self, instruction: String) {
+        self.instructions.push(instruction);
+    }
+
+    fn pop_reg(&mut self) -> usize {
+        if let Some(reg) = self.tmp_regs.pop() {
+            return reg;
+        }
+        self.registers.allocate()
+    }
+
+    fn peek_reg(&mut self) -> usize {
+        if let Some(reg) = self.tmp_regs.clone().pop() {
+            return reg;
+        }
+        self.registers.allocate()
+    }
+
+    fn push_reg(&mut self, reg: usize) {
+        self.tmp_regs.push(reg);
+    }
+
+    fn generate(&mut self, node: &Node) {
+        let data_type = node.data_type;
+        let prefix = data_type.get_prefix();
+
+        match node.value_type {
+            ValueType::Integer(value) => {
+                let reg = self.registers.allocate();
+                self.push_reg(reg);
+                self.push(format!("imov %r{}, {};", reg, value));
+            }
+            ValueType::Float(value) => {
+                let reg = self.registers.allocate();
+                self.push_reg(reg);
+                self.push(format!("fmov %r{}, {};", reg, value));
+            }
+            ValueType::BinOperator(op) => {
+                for child in &node.children {
+                    self.generate(child);
+                }
+                // The binary operator will have a register for each child
+                // and the result will be stored in the first register
+                // So we need to find two free registers to use
+                // And the second register can be freed after the operation
+                let rhr = self.pop_reg();
+                let lhr = self.pop_reg();
+
+                match op {
+                    BinOp::Add => {
+                        self.push(format!("{prefix}add %r{lhr}, %r{rhr} ;"));
                     }
-                },
-                Instruction::Add(data_type, reg1, reg2) => {
-                    asm.push_str(&format!("add {}, {}\n", reg1.unwrap_or(0), reg2.unwrap_or(0)));
-                },
-                Instruction::Sub(data_type, reg1, reg2) => {
-                    asm.push_str(&format!("sub {}, {}\n", reg1.unwrap_or(0), reg2.unwrap_or(0)));
-                },
-                Instruction::Mul(data_type, reg1, reg2) => {
-                    asm.push_str(&format!("mul {}, {}\n", reg1.unwrap(), reg2.unwrap()));
-                },
-                Instruction::Div(data_type, reg1, reg2) => {
-                    asm.push_str(&format!("div {}, {}\n", reg1.unwrap(), reg2.unwrap()));
-                },
-                Instruction::Load(data_type, reg1, reg2) => {
-                    asm.push_str(&format!("load {}, {}\n", reg1.unwrap(), reg2.unwrap()));
-                },
-                Instruction::Store(data_type, reg1, value) => {
-                    match value {
-                        Identifier => {
-                            asm.push_str(&format!("store {}, {}\n", reg1.unwrap(), value));
-                        },
-                        _ => {}
+                    BinOp::Sub => {
+                        self.push(format!("{prefix}sub %r{lhr}, %r{rhr} ;"));
                     }
-                },
-                Instruction::Neg(data_type, reg) => {
-                    asm.push_str(&format!("neg {}\n", reg.unwrap()));
-                },
-                Instruction::Halt => {
-                    asm.push_str("halt\n");
-                },
+                    BinOp::Mul => {
+                        self.push(format!("{prefix}mul %r{lhr}, %r{rhr} ;"));
+                    }
+                    BinOp::Div => {
+                        self.push(format!("{prefix}div %r{lhr}, %r{rhr} ;"));
+                    }
+                }
+
+                self.push_reg(lhr);
+                self.registers.free_register(rhr);
+            }
+            ValueType::UnaryOperator(op) => {
+                for child in &node.children {
+                    self.generate(child);
+                }
+                // The unary operator will have a register for the child
+                // and the result will be stored in the same register
+                let reg = self.peek_reg();
+                match op {
+                    UnaryOp::Neg | UnaryOp::Not => {
+                        self.push(format!("{prefix}neg %r{reg}; neg %r{reg}"));
+                    }
+                }
+            }
+            ValueType::Let => {
+                for child in &node.children {
+                    self.generate(child);
+                }
+            }
+            ValueType::Identifier(name) => {
+                let reg = self.registers.allocate();
+                self.push_reg(reg);
+                self.push(format!("load %r{reg}, {name}"));
+            }
+            ValueType::AssignmentOperator => {
+                for child in &node.children {
+                    self.generate(child);
+                }
+                let reg = self.pop_reg();
+                let sreg = self.registers.allocate();
+                self.push(format!(
+                    "store %r{reg}, %r{sreg}; store %r{reg} in %r{sreg}"
+                ));
+            }
+            ValueType::Root => {
+                for child in &node.children {
+                    self.generate(child);
+                }
             }
         }
     }
-
-    pub fn halt_instruction(&mut self) {
-        self.instructions.push(Instruction::Halt);
-    }
-
-    pub fn generate(&mut self, node: &Node) {
-
-        let reg:Option<usize> = None;
-        let data_type = node.data_type.clone();
-
-        match node.value_type.clone() {
-            BinOperator(op) => {
-                for child in &node.children {
-                    self.generate(child);
-                }
-                self.instructions.push(match op {
-                    BinOp::Add => {
-                        Instruction::Add(data_type, reg, reg)
-                    },
-                    BinOp::Sub => {
-                        Instruction::Sub(data_type, reg, reg)
-                    },
-                    BinOp::Mul => {
-                        Instruction::Mul(data_type, reg, reg)
-                    },
-                    BinOp::Div => {
-                        Instruction::Div(data_type, reg, reg)
-                    },
-                });
-            },
-            UnaryOperator(op) => {
-                for child in &node.children {
-                    self.generate(child);
-                }
-                if op == UnaryOp::Neg {
-                    self.instructions.push(Instruction::Neg(data_type, reg));
-                };
-            },
-            Integer(value) => {
-                self.instructions.push(Instruction::Mov(data_type, reg, Integer(value)));
-            },
-            Float(value) => {
-                self.instructions.push(Instruction::Mov(data_type, reg, Float(value)));
-            },
-            Identifier => {
-                self.instructions.push(Instruction::Load(data_type, reg, reg));
-            },
-            Let => {
-                self.instructions.push(Instruction::Store(data_type, reg, Identifier));
-            },
-
-        }
-    }
-
 }
 
-pub fn generate(node: &Node, asm: &mut String) {
-    let mut generator = Generator::new();
-    generator.generate(node);
-    generator.halt_instruction();
-    generator.to_asm(asm);
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::ast::tree::{DataType, Node, NodeType, ValueType};
+    use crate::tokens::Location;
+
+    #[test]
+    fn test_ir_generator() {
+        let mut node = Node::new(
+            ValueType::BinOperator(BinOp::Add),
+            Location::new(),
+            DataType::Integer,
+            NodeType::Op,
+        );
+        let left = Node::new(
+            ValueType::Integer(10),
+            Location::new(),
+            DataType::Integer,
+            NodeType::Leaf,
+        );
+        let right = Node::new(
+            ValueType::Integer(20),
+            Location::new(),
+            DataType::Integer,
+            NodeType::Leaf,
+        );
+        node.add_child(left);
+        node.add_child(right);
+
+        let mut node3 = Node::new(
+            ValueType::BinOperator(BinOp::Add),
+            Location::new(),
+            DataType::Integer,
+            NodeType::Op,
+        );
+        let left3 = Node::new(
+            ValueType::Integer(30),
+            Location::new(),
+            DataType::Integer,
+            NodeType::Leaf,
+        );
+        let right3 = Node::new(
+            ValueType::Integer(40),
+            Location::new(),
+            DataType::Integer,
+            NodeType::Leaf,
+        );
+        node3.add_child(left3);
+        node3.add_child(right3);
+
+        let mut node2 = Node::new(
+            ValueType::BinOperator(BinOp::Add),
+            Location::new(),
+            DataType::Integer,
+            NodeType::Op,
+        );
+
+        node2.add_child(node3.clone());
+        node2.add_child(node.clone());
+
+        let instructions = generate(&node2);
+        //assert_eq!(instructions.len(), 3);
+        instructions.iter().for_each(|instruction| {
+            println!("{}", instruction);
+        });
+    }
 }

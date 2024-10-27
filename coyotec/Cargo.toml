@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-cyasm = {path = "../cyasm"}
+cyasm = { path = "../cyasm" }
+
 anyhow = "1.0.89"

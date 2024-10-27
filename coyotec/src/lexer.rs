@@ -1,4 +1,4 @@
-#![allow(dead_code, unused_variables)]
+#![allow(dead_code, unused_variables, unused_imports)]
 use std::iter::Peekable;
 use std::str::Chars;
 use crate::tokens::{Location, Token, TokenType};
@@ -60,7 +60,7 @@ impl<'a> Lexer<'a> {
     pub fn make_token(&mut self, token_type: TokenType) -> Token {
         Token {
             token_type,
-            location: self.location.clone(),
+            location: self.location,
         }
     }
 
@@ -164,18 +164,18 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
                     break;
                 }
             }
-
-            match ident.as_str() {
+            let tok = match ident.as_str() {
                 "let" => {
-                    lexer.make_token(TokenType::Let);
+                    lexer.make_token(TokenType::Let)
                 },
                 "func" => {
-                    lexer.make_token(TokenType::Func);
+                    lexer.make_token(TokenType::Func)
                 },
                 _ => {
-                    lexer.make_token(TokenType::Text(Box::new(ident)));
+                    lexer.make_token(TokenType::Identifier(Box::new(ident)))
                 },
-            }
+            };
+            tokens.push(tok);
             lexer.advance();
             continue;
         }
