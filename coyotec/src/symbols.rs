@@ -8,6 +8,7 @@ use std::collections::HashMap;
 pub struct Symbol {
     pub symbols: HashMap<String, usize>,
     pub next: usize,
+    pub register: Option<usize>,
 }
 
 impl Symbol {
@@ -15,6 +16,7 @@ impl Symbol {
         Self {
             symbols: HashMap::new(),
             next: 0,
+            register: None,
         }
     }
 
@@ -23,7 +25,7 @@ impl Symbol {
     pub fn get(&mut self, name: &str) -> usize {
         self.symbols.get(name).copied().unwrap_or_else(|| {
             let id = self.next;
-            self.next+=1;
+            self.next += 1;
             self.symbols.insert(name.to_string(), id);
             id
         })
@@ -35,7 +37,6 @@ pub struct SymbolTable {
     pub symbols: Vec<Symbol>,
     scope: usize,
 }
-
 
 impl SymbolTable {
     pub fn new() -> Self {
@@ -54,13 +55,13 @@ impl SymbolTable {
     /// Push a new scope onto the symbol table
     pub fn push_scope(&mut self) {
         self.symbols.push(Symbol::new());
-        self.scope+=1;
+        self.scope += 1;
     }
 
     /// Pop the current scope from the symbol table
     pub fn pop_scope(&mut self) {
         self.symbols.pop();
-        self.scope-=1;
+        self.scope -= 1;
     }
 }
 

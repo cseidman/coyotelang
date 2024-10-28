@@ -2,7 +2,7 @@
 #![allow(dead_code, unused_variables)]
 
 use crate::allocator::Registers;
-use crate::ast::tree::{BinOp, Node, NodeType, UnaryOp, ValueType};
+use crate::ast::tree::{BinOp, Node, UnaryOp, ValueType};
 
 /// These are the instructions that the IR will have
 /// The IR will be in SSA form
@@ -108,9 +108,17 @@ impl IrGenerator {
                 }
             }
             ValueType::Let => {
+                println!("Generating let");
                 for child in &node.children {
                     self.generate(child);
                 }
+
+                let reg = self.pop_reg();
+                let sreg = self.pop_reg();
+
+                self.push(format!(
+                    "{prefix}store %r{sreg}, %r{reg}; store %r{sreg} in %r{reg}",
+                ));
             }
             ValueType::Identifier(name) => {
                 let reg = self.registers.allocate();
@@ -122,9 +130,9 @@ impl IrGenerator {
                     self.generate(child);
                 }
                 let reg = self.pop_reg();
-                let sreg = self.registers.allocate();
+                let sreg = self.pop_reg();
                 self.push(format!(
-                    "store %r{reg}, %r{sreg}; store %r{reg} in %r{sreg}"
+                    "store %r{sreg}, %r{reg}; store %r{sreg} in %r{reg}"
                 ));
             }
             ValueType::Root => {

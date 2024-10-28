@@ -76,6 +76,7 @@ impl Vm {
                 let rval = self.registers[reg1].as_integer();
                 let lval = self.registers[reg2].as_integer();
                 self.registers[reg1].i = lval $op rval;
+                println!("R{reg1}, R{reg2}; R{reg1}={lval}  R{reg2}={rval}");
             };
         }
 
@@ -89,34 +90,35 @@ impl Vm {
                 self.registers[reg1].f = lval $op rval;
             };
         }
-
+        println!("\nVM Debug");
+        println!("--------");
         loop {
             let b = self.get_instruction();
-
+            print!("{} ", Instructions[b as usize]);
             match b {
                 STORE => {
                     let reg = self.get_register_location();
                     let value = self.read_register_value();
                     self.registers[reg] = value;
-                    //print!("store {}, {}\t", reg, value.as_integer());
+                    println!("R{}, {};", reg, value.as_integer());
                 }
                 ISTORE => {
                     let reg = self.get_register_location();
-                    let value = self.read_register_value();
-                    self.registers[reg] = value;
-                    //print!("store {}, {}\t", reg, value.as_integer());
+                    let value = self.get_data().as_integer();
+                    self.registers[reg].i = value;
+                    println!("R{}, {};", reg, value);
                 }
                 LOAD => {
                     let reg = self.get_register_location();
                     let value = self.read_register_value();
                     self.registers[reg] = value;
-                    //print!("load {}, {}\t", reg, value.as_integer());
+                    println!("R{}, {};", reg, value.as_integer());
                 }
                 IMOV => {
                     let reg = self.get_register_location();
                     let value = self.get_data().as_integer();
                     self.registers[reg].i = value;
-                    //print!("imov {}, {}\t", reg, value);
+                    println!("R{}, {};", reg, value);
                 }
                 FMOV => {
                     let reg = self.get_register_location();
@@ -149,7 +151,7 @@ impl Vm {
                     fbinop!(/);
                 }
                 HALT => {
-                    //println!("HALT\t");
+                    println!();
                     break;
                 }
                 _ => {
@@ -157,6 +159,7 @@ impl Vm {
                     break;
                 }
             }
+
             //for i in 0..5 {
             //    print!("[{}]\t", self.registers[i].as_integer());
             //}
@@ -182,13 +185,22 @@ mod test {
         vm.code = vec![
             IMOV, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, IMOV, 1, 0, 3, 0, 0, 0, 0, 0, 0, 0, IMOV, 2, 0, 2,
             0, 0, 0, 0, 0, 0, 0, IMUL, 1, 0, 2, 0, IMOV, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, IADD, 1, 0,
-            2, 0, IADD, 0, 0, 1, 0, 0,
+            2, 0, IADD, 0, 0, 1, 0, HALT,
         ];
         vm.run();
-        //for i in 0..4 {
-        //    println!("Register {}: {:?}", i, vm.registers[i].as_integer());
-        //}
-        println!("{}", vm.registers[0].as_integer());
+
         assert_eq!(vm.registers[0].as_integer(), 11);
+    }
+
+    #[test]
+    fn test_vm_let() {
+        let mut vm = Vm::new();
+        vm.code = vec![
+            ISTORE, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, ISTORE, 1, 0, 3, 0, 0, 0, 0, 0, 0, 0, IADD, 0, 0,
+            1, 0, HALT,
+        ];
+        vm.run();
+
+        assert_eq!(vm.registers[0].as_integer(), 7);
     }
 }

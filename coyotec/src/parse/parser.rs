@@ -63,12 +63,13 @@ impl<'a> Parser<'a> {
             NodeType::Statement,
         );
 
+        // Make a new identifier node and add it to the `let` node
         let init_identifier = self.new_identifier()?;
         node.add_child(init_identifier);
 
         // Parse the identifier and make another child node from it
-        let id_node = self.parse_identifier()?;
-        node.add_child(id_node);
+        //let id_node = self.parse_identifier()?;
+        //node.add_child(id_node);
         Some(node)
     }
 
