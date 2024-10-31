@@ -2,7 +2,8 @@
 #![allow(dead_code, unused_variables)]
 
 use crate::allocator::Registers;
-use crate::ast::tree::{BinOp, Node, UnaryOp, ValueType};
+use crate::ast::tree::{BinOp, Command, Node, UnaryOp, ValueType};
+use std::collections::HashMap;
 
 /// These are the instructions that the IR will have
 /// The IR will be in SSA form
@@ -11,6 +12,9 @@ struct IrGenerator {
     registers: Registers,
     instructions: Vec<String>,
     tmp_regs: Vec<usize>,
+
+    scope: usize,
+    symbol_regs: Vec<HashMap<String, usize>>,
 }
 
 pub fn generate(node: &Node) -> Vec<String> {
@@ -25,7 +29,19 @@ impl IrGenerator {
             registers: Registers::new(1024000),
             instructions: Vec::new(),
             tmp_regs: Vec::new(),
+            scope: 0,
+            symbol_regs: vec![HashMap::new()],
         }
+    }
+
+    fn store_variable(&mut self, name: &str) -> usize {
+        let reg = self.registers.allocate();
+        self.symbol_regs[self.scope].insert(name.to_string(), reg);
+        reg
+    }
+
+    fn get_variable(&mut self, name: &str) -> Option<usize> {
+        self.symbol_regs[self.scope].get(name).copied()
     }
 
     fn push(&mut self, instruction: String) {
@@ -54,7 +70,7 @@ impl IrGenerator {
         let data_type = node.data_type;
         let prefix = data_type.get_prefix();
 
-        match node.value_type {
+        match &node.value_type {
             ValueType::Integer(value) => {
                 let reg = self.registers.allocate();
                 self.push_reg(reg);
@@ -103,43 +119,58 @@ impl IrGenerator {
                 let reg = self.peek_reg();
                 match op {
                     UnaryOp::Neg | UnaryOp::Not => {
-                        self.push(format!("{prefix}neg %r{reg}; neg %r{reg}"));
+                        self.push(format!("{prefix}neg %r{reg};"));
                     }
                 }
             }
-            ValueType::Let => {
-                println!("Generating let");
-                for child in &node.children {
-                    self.generate(child);
+            ValueType::Statement(command) if *command == Command::Let => {
+                let node = node.children[0].clone();
+
+                // If it's NOT an identifier, panic
+                let identifier_name = match &node.value_type {
+                    ValueType::Identifier(name) => name,
+                    _ => panic!("Expected identifier: found {:?}", node),
+                };
+
+                let data_type = node.data_type;
+                let prefix = data_type.get_prefix();
+
+                // Check of the next child in an assignment operator
+                let next_node = &node.children[0];
+                if next_node.value_type == ValueType::AssignmentOperator {
+                    self.generate(&node.children[1]);
+
+                    // Assign a register to the identifier and store it
+                    let sreg = self.store_variable(identifier_name);
+                    let reg = self.pop_reg();
+
+                    self.push(format!("{prefix}store %r{sreg}, %r{reg};",));
                 }
-
+            }
+            ValueType::Statement(command) if *command == Command::Print => {
+                for c in &node.children {
+                    self.generate(c);
+                }
                 let reg = self.pop_reg();
-                let sreg = self.pop_reg();
-
-                self.push(format!(
-                    "{prefix}store %r{sreg}, %r{reg}; store %r{sreg} in %r{reg}",
-                ));
+                self.push(format!("print %r{reg};"));
             }
             ValueType::Identifier(name) => {
-                let reg = self.registers.allocate();
-                self.push_reg(reg);
-                self.push(format!("load %r{reg}, {name}"));
-            }
-            ValueType::AssignmentOperator => {
-                for child in &node.children {
-                    self.generate(child);
+                if let Some(var_reg) = self.get_variable(name) {
+                    let reg = self.registers.allocate();
+                    self.push_reg(reg);
+                    self.push(format!("load %r{reg}, %r{var_reg}"));
+                } else {
+                    panic!("Variable {} not found", name);
                 }
-                let reg = self.pop_reg();
-                let sreg = self.pop_reg();
-                self.push(format!(
-                    "store %r{sreg}, %r{reg}; store %r{sreg} in %r{reg}"
-                ));
             }
+
             ValueType::Root => {
                 for child in &node.children {
                     self.generate(child);
                 }
             }
+
+            _ => {}
         }
     }
 }

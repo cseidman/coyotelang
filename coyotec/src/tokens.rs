@@ -38,6 +38,7 @@ pub enum TokenType {
     Identifier(Box<String>),
     Let,
     Func,
+    Print,
     EOF,
 }
 #[derive(Clone, Copy, Debug)]
@@ -52,30 +53,25 @@ impl Default for Location {
     }
 }
 
-
 impl Location {
     pub fn new() -> Self {
-        Self {
-            line: 1,
-            column: 0,
-        }
+        Self { line: 1, column: 0 }
     }
 
     pub fn newline(&mut self) {
-        self.line+=1;
-        self.column=0;
+        self.line += 1;
+        self.column = 0;
     }
 
     pub fn increment(&mut self, by: usize) {
-        self.column+=by;
+        self.column += by;
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct Token {
     pub token_type: TokenType,
-    pub location: Location
+    pub location: Location,
 }
 
 #[cfg(test)]
@@ -85,8 +81,8 @@ mod test {
     #[test]
     fn test_location() {
         let mut loc = Location::new();
-        assert_eq!(loc.line,1);
-        assert_eq!(loc.column,0);
-        loc.increment(1) ;
+        assert_eq!(loc.line, 1);
+        assert_eq!(loc.column, 0);
+        loc.increment(1);
     }
 }

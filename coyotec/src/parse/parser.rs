@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_variables, unused_imports)]
 use crate::ast::tree::ValueType::*;
-use crate::ast::tree::{BinOp, DataType, Node, NodeType, UnaryOp, ValueType};
+use crate::ast::tree::{BinOp, Command, DataType, Node, NodeType, UnaryOp, ValueType};
 /// The parser takes a vector of tokens from the lexer and builds the AST
 ///
 /// The parser is a recursive descent parser that builds the AST from the tokens
@@ -9,7 +9,7 @@ use anyhow::{Error, Result};
 use std::slice::Iter;
 
 use crate::allocator::Registers;
-use crate::symbols::SymbolTable;
+use crate::symbols::{Symbol, SymbolTable};
 
 const PREVIOUS: usize = 0;
 const CURRENT: usize = 1;
@@ -57,7 +57,7 @@ impl<'a> Parser<'a> {
 
         // Create a new node from the `let` token
         let mut node = Node::new(
-            Let,
+            Statement(Command::Let),
             self.peek()?.location,
             DataType::None,
             NodeType::Statement,
@@ -73,31 +73,14 @@ impl<'a> Parser<'a> {
         Some(node)
     }
 
-    fn new_identifier(&mut self) -> Option<Node> {
-        let token = self.advance()?;
-        if let TokenType::Identifier(name) = token.token_type {
-            let ident_id = self.symbol_table.get(&name);
-            let node = Node::new(
-                Identifier(ident_id),
-                token.location,
-                DataType::None,
-                NodeType::Expr,
-            );
-            return Some(node);
-        }
-        None
-    }
-
     /// Parse an identifier into a node
     ///
-    fn parse_identifier(&mut self) -> Option<Node> {
-        println!("Parsing identifier");
+    fn new_identifier(&mut self) -> Option<Node> {
+        //println!("Parsing identifier");
         let token = self.advance()?;
         if let TokenType::Identifier(name) = token.token_type {
-            let ident_id = self.symbol_table.get(&name);
-
             let mut idnode = Node::new(
-                Identifier(ident_id),
+                Identifier(*name.clone()),
                 token.location,
                 DataType::None,
                 NodeType::Expr,
@@ -116,8 +99,9 @@ impl<'a> Parser<'a> {
                         TokenType::Text(_) => DataType::String,
                         TokenType::Boolean(_) => DataType::Boolean,
                         TokenType::Struct(name) => {
-                            let ident = self.symbol_table.get(&name);
-                            DataType::Struct(ident)
+                            //let ident = self.symbol_table.get(&name);
+                            // todo: get the data type from the symbol table
+                            DataType::Struct(0)
                         }
                         _ => DataType::None,
                     },
@@ -127,10 +111,10 @@ impl<'a> Parser<'a> {
 
             // If the type wasn't specified then the data type MUST be inferred from the
             // assign
-            println!("Parsing assignment");
+            //println!("Parsing assignment");
             match next_token.token_type {
                 TokenType::Assign => {
-                    println!("Found assignment");
+                    //println!("Found assignment");
                     self.advance();
                     let expr = self.parse_expr()?;
                     // Edge case. If the data type was specified then the expression must match
@@ -140,16 +124,15 @@ impl<'a> Parser<'a> {
                     }
                     // If not, the node infers the datatype from the expression
                     idnode.data_type = expr.data_type;
-                    println!("Data type assigned to identifier {:?}", idnode.data_type);
+                    //println!("Data type assigned to identifier {:?}", idnode.data_type);
 
-                    let node = idnode;
-                    idnode = Node::new(
+                    let asg_node = Node::new(
                         ValueType::AssignmentOperator,
                         token.location,
                         expr.data_type,
                         NodeType::Statement,
                     );
-                    idnode.add_child(node);
+                    idnode.add_child(asg_node);
                     idnode.add_child(expr);
                 }
                 _ => {
@@ -163,7 +146,8 @@ impl<'a> Parser<'a> {
                 println!("Data type not assigned to identifier");
                 return None;
             }
-
+            self.symbol_table
+                .add_symbol(&*name.clone(), idnode.clone().data_type);
             return Some(idnode);
         }
         None
@@ -177,16 +161,37 @@ impl<'a> Parser<'a> {
             NodeType::Statement,
         );
         while let Some(token) = self.peek() {
-            let n = match token.token_type {
-                TokenType::Let => self.parse_let(),
-                TokenType::Identifier(_) => self.parse_identifier(),
-                _ => self.parse_expr(),
+            match token.token_type {
+                TokenType::Let => {
+                    if let Some(n) = self.parse_let() {
+                        node.add_child(n);
+                    }
+                }
+                TokenType::Print => {
+                    self.advance();
+                    let expr = self.parse_expr()?;
+                    let mut print_node = Node::new(
+                        ValueType::Statement(Command::Print),
+                        token.location,
+                        DataType::None,
+                        NodeType::Statement,
+                    );
+                    print_node.add_child(expr);
+                    node.add_child(print_node);
+                }
+
+                TokenType::Newline => {
+                    self.advance();
+                    continue;
+                }
+                _ => {
+                    if let Some(n) = self.parse_expr() {
+                        node.add_child(n);
+                    } else {
+                        self.advance();
+                    }
+                }
             };
-            if let Some(n) = n {
-                node.add_child(n);
-            } else {
-                break;
-            }
         }
         Some(node)
     }
@@ -245,8 +250,22 @@ impl<'a> Parser<'a> {
                     NodeType::Expr,
                 ))
             }
-            TokenType::Identifier(_) => self.parse_identifier(),
-            _ => None,
+            TokenType::Identifier(name) => {
+                self.advance();
+                let data_type = if let Some(item) = self.symbol_table.get(&name) {
+                    item.data_type
+                } else {
+                    DataType::None
+                };
+                Some(Node::new(
+                    Identifier(*name),
+                    token.location,
+                    data_type,
+                    NodeType::Expr,
+                ))
+            }
+            TokenType::EOF => None,
+            _ => panic!("Unexpected token {:?}", token.token_type),
         };
 
         if let Some(mut unary) = unary_node {

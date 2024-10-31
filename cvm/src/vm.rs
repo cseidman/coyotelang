@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use crate::constants::*;
+
 #[derive(Copy, Clone)]
 union Value {
     i: i64,
@@ -94,7 +95,7 @@ impl Vm {
         println!("--------");
         loop {
             let b = self.get_instruction();
-            print!("{} ", Instructions[b as usize]);
+            print!("{} ", INSTRUCTIONS[b as usize]);
             match b {
                 STORE => {
                     let reg = self.get_register_location();
@@ -103,16 +104,16 @@ impl Vm {
                     println!("R{}, {};", reg, value.as_integer());
                 }
                 ISTORE => {
-                    let reg = self.get_register_location();
-                    let value = self.get_data().as_integer();
-                    self.registers[reg].i = value;
-                    println!("R{}, {};", reg, value);
+                    let dest = self.get_register_location();
+                    let value = self.get_register_location();
+                    self.registers[dest] = self.registers[value];
+                    println!("R{}, R{};", dest, value);
                 }
                 LOAD => {
                     let reg = self.get_register_location();
-                    let value = self.read_register_value();
-                    self.registers[reg] = value;
-                    println!("R{}, {};", reg, value.as_integer());
+                    let value = self.get_register_location();
+                    self.registers[reg] = self.registers[value];
+                    println!("R{}, R{};", reg, value);
                 }
                 IMOV => {
                     let reg = self.get_register_location();
@@ -150,6 +151,16 @@ impl Vm {
                 FDIV => {
                     fbinop!(/);
                 }
+                INEG => {
+                    let reg = self.get_register_location();
+                    self.registers[reg].i = -self.registers[reg].as_integer();
+                }
+                PRINT => {
+                    let reg = self.get_register_location();
+                    let value = self.registers[reg].as_integer();
+                    println!("R{reg}");
+                    println!("\t{value}");
+                }
                 HALT => {
                     println!();
                     break;
@@ -165,7 +176,8 @@ impl Vm {
             //}
             //println!();
         }
-        println!("{}", self.registers[0].as_integer());
+
+        //println!("{}", self.registers[0].as_integer());
     }
 }
 

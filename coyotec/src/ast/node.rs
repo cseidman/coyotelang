@@ -3,7 +3,7 @@ use crate::ast::tree::{NodeType, ValueType};
 use crate::tokens::Location;
 use std::fmt::{Display, Formatter};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Node {
     pub value_type: ValueType,
     pub children: Vec<Node>,
@@ -35,5 +35,11 @@ impl Node {
     }
     pub fn add_child(&mut self, node: Node) {
         self.children.push(node);
+    }
+    pub fn display_tree(&self) {
+        println!("{}", self);
+        for child in &self.children {
+            child.display_tree();
+        }
     }
 }

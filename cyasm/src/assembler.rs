@@ -137,6 +137,8 @@ impl<'a> Parser<'a> {
             "store" => Some(STORE),
             "istore" => Some(ISTORE),
             "load" => Some(LOAD),
+            "print" => Some(PRINT),
+            "ineg" => Some(INEG),
             _ => None,
         }
     }
@@ -171,15 +173,17 @@ mod test {
         imov %r2, 1 ;
         iadd %r1, %r2 ;
         iadd %r0, %r1 ;
-        store %r3, %r0 ;
-        istore %r4, 3 ;
+        istore %r3, %r0 ;
+        imov %r4, 10 ;
+        iadd %r4, %r3 ;
         "#;
         let mut parser = Parser::new(asm);
         let byte_code = parser.assemble();
         let expected = vec![
             IMOV, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, IMOV, 1, 0, 3, 0, 0, 0, 0, 0, 0, 0, IMOV, 2, 0, 2,
             0, 0, 0, 0, 0, 0, 0, IMUL, 1, 0, 2, 0, IMOV, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, IADD, 1, 0,
-            2, 0, IADD, 0, 0, 1, 0, STORE, 3, 0, 0, 0, ISTORE, 4, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0,
+            2, 0, IADD, 0, 0, 1, 0, ISTORE, 3, 0, 0, 0, IMOV, 4, 0, 10, 0, 0, 0, 0, 0, 0, 0, IADD,
+            4, 0, 3, 0, 0,
         ];
         assert_eq!(byte_code, expected);
     }

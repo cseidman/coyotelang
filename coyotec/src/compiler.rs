@@ -1,4 +1,5 @@
 #![allow(unused_assignments, unused_variables)]
+use crate::debug::display_ast;
 use crate::generator::generate;
 use crate::lexer::{lex, SourceType};
 use crate::parse::parser::parse;
@@ -11,7 +12,9 @@ pub fn compile(code: &str, source_type: SourceType) -> Result<Vec<u8>> {
     // Empty vector to hold the compiled bytecode
     let mut bytecode = Vec::new();
     let tokens = lex(code, source_type)?;
+
     let node = parse(&tokens);
+    //node.unwrap().display_tree();
     // Lex the code
 
     // Parse the tokens
@@ -20,11 +23,11 @@ pub fn compile(code: &str, source_type: SourceType) -> Result<Vec<u8>> {
         //display_ast(&node, 0);
 
         // Generate the assembly code
-        println!("Generated asm...");
+        //println!("Generating asm...");
         let instructions = generate(&node);
         let mut asm = String::new();
         for line in instructions {
-            println!("{}", line);
+            //println!("{}", line);
             asm.push_str(&line);
         }
 

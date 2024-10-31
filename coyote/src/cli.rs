@@ -1,12 +1,12 @@
 #![allow(unused_variables)]
-use rustyline::DefaultEditor;
-use rustyline::error::ReadlineError;
 use anyhow::Result;
+use rustyline::error::ReadlineError;
+use rustyline::DefaultEditor;
 
-use clap::{Parser};
+use clap::Parser;
 use colored::Colorize;
-use coyotec::lexer::{SourceType};
 use coyotec::compiler::compile;
+use coyotec::lexer::SourceType;
 use cvm::vm;
 
 #[derive(Parser, Debug)]
@@ -44,7 +44,8 @@ pub fn run() -> Result<()> {
     // Check for file loading
     if let Some(file) = &cli.file {
         println!("Loading file: {}", file);
-        load_file(file)?;
+        let bytecode = load_file(file)?;
+        vm::execute(bytecode);
     }
 
     // Check if debug mode is enabled
@@ -87,18 +88,18 @@ fn repl() -> Result<()> {
                 if let Ok(bytecode) = compile(&line, SourceType::Interactive) {
                     vm::execute(bytecode);
                 }
-            },
+            }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");
-                break
-            },
+                break;
+            }
             Err(ReadlineError::Eof) => {
                 println!("CTRL-D");
-                break
-            },
+                break;
+            }
             Err(err) => {
                 println!("Error: {:?}", err);
-                break
+                break;
             }
         }
     }

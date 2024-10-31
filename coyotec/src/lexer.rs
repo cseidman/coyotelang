@@ -1,8 +1,8 @@
 #![allow(dead_code, unused_variables, unused_imports)]
-use std::iter::Peekable;
-use std::str::Chars;
 use crate::tokens::{Location, Token, TokenType};
 use anyhow::{anyhow, Context, Result};
+use std::iter::Peekable;
+use std::str::Chars;
 
 pub enum SourceType {
     Interactive,
@@ -30,7 +30,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn advance(&mut self) -> Option<char>{
+    pub fn advance(&mut self) -> Option<char> {
         let value = self.source.code.next();
         self.location.increment(1);
         value
@@ -97,19 +97,25 @@ impl<'a> Lexer<'a> {
 
     pub fn report_error(&mut self, err_msg: &str) {
         self.error_mode = true;
-        println!("{} at line {} position {}", err_msg, self.location.line, self.location.column);
+        println!(
+            "{} at line {} position {}",
+            err_msg, self.location.line, self.location.column
+        );
     }
 
     fn make_error(&mut self, err_msg: &str) -> anyhow::Error {
         self.error_mode = true;
-        anyhow!("{} at line {} position {}", err_msg, self.location.line, self.location.column)
+        anyhow!(
+            "{} at line {} position {}",
+            err_msg,
+            self.location.line,
+            self.location.column
+        )
     }
-
 }
 
 pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
-
-    let mut tokens:Vec<Token> = Vec::new();
+    let mut tokens: Vec<Token> = Vec::new();
 
     let mut lexer = Lexer::new(Source {
         code: code.chars().peekable(),
@@ -117,7 +123,6 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
     });
 
     while let Some(&c) = lexer.peek() {
-
         // Get rid of whitespace characters
         if [' ', '\t'].contains(&c) {
             lexer.advance();
@@ -137,17 +142,16 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
                     is_float = true;
                     snum.push('.');
 
-                    let num2:String = lexer.get_number();
+                    let num2: String = lexer.get_number();
                     snum.push_str(&num2);
-
                 }
             }
             if is_float {
-                let num:f64 = snum.parse().unwrap();
+                let num: f64 = snum.parse().unwrap();
                 tokens.push(lexer.make_token(TokenType::Float(num)));
                 continue;
             } else {
-                let num:i64 = snum.parse().unwrap();
+                let num: i64 = snum.parse().unwrap();
                 tokens.push(lexer.make_token(TokenType::Integer(num)));
                 continue;
             }
@@ -165,15 +169,10 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
                 }
             }
             let tok = match ident.as_str() {
-                "let" => {
-                    lexer.make_token(TokenType::Let)
-                },
-                "func" => {
-                    lexer.make_token(TokenType::Func)
-                },
-                _ => {
-                    lexer.make_token(TokenType::Identifier(Box::new(ident)))
-                },
+                "let" => lexer.make_token(TokenType::Let),
+                "func" => lexer.make_token(TokenType::Func),
+                "print" => lexer.make_token(TokenType::Print),
+                _ => lexer.make_token(TokenType::Identifier(Box::new(ident))),
             };
             tokens.push(tok);
             lexer.advance();
@@ -200,7 +199,7 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
                 } else {
                     TokenType::Assign
                 }
-            },
+            }
             '+' => TokenType::Plus,
             '-' => TokenType::Minus,
             '*' => TokenType::Star,
@@ -210,18 +209,18 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
                         '/' => {
                             lexer.single_line_comment();
                             continue;
-                        },
+                        }
                         '*' => {
                             lexer.multi_line_comment();
                             continue;
-                        },
+                        }
                         _ => {
-                           lexer.make_token(TokenType::Slash);
-                        },
+                            lexer.make_token(TokenType::Slash);
+                        }
                     }
                 }
                 TokenType::Slash
-            },
+            }
             '%' => TokenType::Percent,
             '<' => TokenType::LessThan,
             '>' => TokenType::GreaterThan,
@@ -234,7 +233,7 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
             '\n' => {
                 lexer.newline();
                 TokenType::Newline
-            },
+            }
             '$' => TokenType::Dollar,
             '"' => {
                 let mut s = String::new();
@@ -247,7 +246,7 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
                 }
                 lexer.advance();
                 TokenType::Text(Box::new(s))
-            },
+            }
             _ => {
                 let err_msg = format!("Unexpected character: {c}");
                 lexer.report_error(&err_msg);
@@ -262,4 +261,3 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
     tokens.push(lexer.make_token(TokenType::EOF));
     Ok(tokens)
 }
-

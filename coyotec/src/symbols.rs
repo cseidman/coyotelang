@@ -3,11 +3,20 @@
 // nor do the numbers have any meaning other than being unique. This is a way to avoid carrying
 // strings in emums and avoiding clones
 
+use crate::ast::tree::DataType;
 use std::collections::HashMap;
+#[derive(Clone)]
+pub struct Item {
+    pub data_type: DataType,
+}
+impl Item {
+    pub fn new(data_type: DataType) -> Self {
+        Self { data_type }
+    }
+}
 
 pub struct Symbol {
-    pub symbols: HashMap<String, usize>,
-    pub next: usize,
+    pub symbols: HashMap<String, Item>,
     pub register: Option<usize>,
 }
 
@@ -15,20 +24,18 @@ impl Symbol {
     pub fn new() -> Self {
         Self {
             symbols: HashMap::new(),
-            next: 0,
             register: None,
         }
     }
 
-    /// Get the unique number for a given identifier name. If the name is not in the map
+    fn add_symbol(&mut self, name: &str, data_type: DataType) {
+        self.symbols.insert(name.to_string(), Item::new(data_type));
+    }
+
+    /// Get the item for a given identifier name. If the name is not in the map
     /// it creates a new entry in the symbol table and returns the unique number
-    pub fn get(&mut self, name: &str) -> usize {
-        self.symbols.get(name).copied().unwrap_or_else(|| {
-            let id = self.next;
-            self.next += 1;
-            self.symbols.insert(name.to_string(), id);
-            id
-        })
+    pub fn get(&mut self, name: &str) -> Option<Item> {
+        self.symbols.get(name).cloned()
     }
 }
 
@@ -48,8 +55,13 @@ impl SymbolTable {
 
     /// Get the unique number for a given identifier name. If the name is not in the map
     /// it creates a new entry in the symbol table and returns the unique number
-    pub fn get(&mut self, name: &str) -> usize {
+    pub fn get(&mut self, name: &str) -> Option<Item> {
         self.symbols[self.scope].get(name)
+    }
+
+    pub fn add_symbol(&mut self, name: &str, data_type: DataType) {
+        let scope = self.scope;
+        self.symbols[scope].add_symbol(name, data_type);
     }
 
     /// Push a new scope onto the symbol table
@@ -62,34 +74,5 @@ impl SymbolTable {
     pub fn pop_scope(&mut self) {
         self.symbols.pop();
         self.scope -= 1;
-    }
-}
-
-/// Tests for the symbol table
-///
-#[cfg(test)]
-mod test {
-    use crate::symbols::{Symbol, SymbolTable};
-
-    #[test]
-    fn test_symbol() {
-        let mut sym = Symbol::new();
-        assert_eq!(sym.get("foo"), 0);
-        assert_eq!(sym.get("bar"), 1);
-        assert_eq!(sym.get("foo"), 0);
-    }
-
-    #[test]
-    fn test_symbol_table() {
-        let mut sym_table = SymbolTable::new();
-        assert_eq!(sym_table.get("foo"), 0);
-        assert_eq!(sym_table.get("bar"), 1);
-        sym_table.push_scope();
-
-        assert_eq!(sym_table.get("foo"), 0);
-        sym_table.pop_scope();
-
-        assert_eq!(sym_table.get("foo"), 0);
-        assert_eq!(sym_table.get("bar"), 1);
     }
 }

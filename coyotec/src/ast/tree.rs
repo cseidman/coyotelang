@@ -4,15 +4,21 @@ pub use crate::ast::{datatype::DataType, Node};
 
 use std::fmt::{Display, Formatter};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Debug, PartialEq)]
+pub enum Command {
+    Let,
+    Print,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum ValueType {
     Root,
     Integer(i64),
     Float(f64),
     BinOperator(BinOp),
     UnaryOperator(UnaryOp),
-    Identifier(usize),
-    Let,
+    Identifier(String),
+    Statement(Command),
     AssignmentOperator,
 }
 
@@ -42,9 +48,10 @@ impl Display for ValueType {
             ValueType::Identifier(value) => {
                 write!(f, "{value}")
             }
-            ValueType::Let => {
-                write!(f, "Let")
-            }
+            ValueType::Statement(command) => match command {
+                Command::Let => write!(f, "Let"),
+                Command::Print => write!(f, "Print"),
+            },
             ValueType::AssignmentOperator => {
                 write!(f, "AssignmentOperator")
             }
@@ -55,7 +62,7 @@ impl Display for ValueType {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BinOp {
     Add,
     Sub,
