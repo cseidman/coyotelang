@@ -137,7 +137,7 @@ impl<'a> Parser<'a> {
             "store" => Some(STORE),
             "istore" => Some(ISTORE),
             "load" => Some(LOAD),
-            "print" => Some(PRINT),
+            "print" => Some(IPRINT),
             "ineg" => Some(INEG),
             _ => None,
         }

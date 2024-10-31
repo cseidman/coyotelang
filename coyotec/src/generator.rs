@@ -152,7 +152,7 @@ impl IrGenerator {
                     self.generate(c);
                 }
                 let reg = self.pop_reg();
-                self.push(format!("print %r{reg};"));
+                self.push(format!("{prefix}print %r{reg};"));
             }
             ValueType::Identifier(name) => {
                 if let Some(var_reg) = self.get_variable(name) {

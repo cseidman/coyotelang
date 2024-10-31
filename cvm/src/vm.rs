@@ -155,7 +155,7 @@ impl Vm {
                     let reg = self.get_register_location();
                     self.registers[reg].i = -self.registers[reg].as_integer();
                 }
-                PRINT => {
+                IPRINT => {
                     let reg = self.get_register_location();
                     let value = self.registers[reg].as_integer();
                     println!("R{reg}");
