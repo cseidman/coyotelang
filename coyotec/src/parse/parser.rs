@@ -173,7 +173,7 @@ impl<'a> Parser<'a> {
                     let mut print_node = Node::new(
                         ValueType::Statement(Command::Print),
                         token.location,
-                        DataType::None,
+                        expr.data_type,
                         NodeType::Statement,
                     );
                     print_node.add_child(expr);
@@ -215,21 +215,30 @@ impl<'a> Parser<'a> {
         println!("{}", msg);
         Err(Error::msg(msg))
     }
+
+    fn grouping(&mut self) -> Node {
+        let expr = self.parse_expr().unwrap();
+        if self.expect_token(TokenType::RParen).is_err() {
+            panic!("Expected closing parenthesis");
+        }
+        expr
+    }
+
     /// Parse a primary expression which is either a number, a unary operator, or a grouping
     fn parse_primary(&mut self) -> Option<Node> {
-        if self.match_token(TokenType::LParen) {
+        // Check for a unary operator
+        if let Some(mut node) = self.parse_unary() {
             let expr = self.parse_expr()?;
-            if self.expect_token(TokenType::RParen).is_err() {
-                return None;
-            }
-            return Some(expr);
+            node.add_child(expr);
+            return Some(node);
         }
 
-        // Check for a unary operator
         let token = self.peek()?;
-        let unary_node = self.parse_unary();
 
-        let token = self.peek()?;
+        // Check for a grouping
+        if self.match_token(TokenType::LParen) {
+            return Some(self.grouping());
+        }
 
         let node = match token.token_type {
             TokenType::Integer(value) => {
@@ -268,11 +277,6 @@ impl<'a> Parser<'a> {
             _ => panic!("Unexpected token {:?}", token.token_type),
         };
 
-        if let Some(mut unary) = unary_node {
-            let node = node.unwrap();
-            unary.add_child(node);
-            return Some(unary);
-        }
         node
     }
 

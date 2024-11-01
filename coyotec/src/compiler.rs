@@ -27,7 +27,7 @@ pub fn compile(code: &str, source_type: SourceType) -> Result<Vec<u8>> {
         let instructions = generate(&node);
         let mut asm = String::new();
         for line in instructions {
-            //println!("{}", line);
+            println!("{}", line);
             asm.push_str(&line);
         }
 
