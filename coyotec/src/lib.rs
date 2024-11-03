@@ -4,7 +4,8 @@ pub mod tokens;
 
 mod allocator;
 pub mod ast;
+pub mod datatypes;
 mod debug;
-mod generator;
-mod parse;
+pub mod generator;
+pub mod parse;
 mod symbols;

@@ -4,23 +4,43 @@
 use crate::allocator::Registers;
 use crate::ast::tree::{BinOp, Command, Node, UnaryOp, ValueType};
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 
 /// These are the instructions that the IR will have
 /// The IR will be in SSA form
 
-struct IrGenerator {
+pub struct IrGenerator {
     registers: Registers,
     instructions: Vec<String>,
     tmp_regs: Vec<usize>,
 
+    string_pool: Vec<String>,
+    strings_index: usize,
     scope: usize,
     symbol_regs: Vec<HashMap<String, usize>>,
 }
 
-pub fn generate(node: &Node) -> Vec<String> {
+pub fn generate(node: &Node) -> String {
     let mut generator = IrGenerator::new(node);
     generator.generate(node);
-    generator.instructions
+    format!("{}", generator)
+}
+
+impl Display for IrGenerator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // Write out the constants
+        writeln!(f, ".constants")?;
+        for s in self.string_pool.iter() {
+            writeln!(f, "    {}", s)?;
+        }
+        writeln!(f, ".end")?;
+        //writeln!(f, ".instructions")?;
+        for line in &self.instructions {
+            writeln!(f, "{line}")?;
+        }
+        //writeln!(f, ".end")?;
+        writeln!(f, "")
+    }
 }
 
 impl IrGenerator {
@@ -29,9 +49,23 @@ impl IrGenerator {
             registers: Registers::new(1024000),
             instructions: Vec::new(),
             tmp_regs: Vec::new(),
+            string_pool: Vec::new(),
+            strings_index: 0,
             scope: 0,
             symbol_regs: vec![HashMap::new()],
         }
+    }
+
+    fn get_string_location(&mut self, string: &str) -> usize {
+        for (i, s) in self.string_pool.iter().enumerate() {
+            if s == string {
+                return i;
+            }
+        }
+        let idx = self.strings_index;
+        self.string_pool.push(string.to_string());
+        self.strings_index += 1;
+        idx
     }
 
     fn store_variable(&mut self, name: &str) -> usize {
@@ -66,9 +100,10 @@ impl IrGenerator {
         self.tmp_regs.push(reg);
     }
 
-    fn generate(&mut self, node: &Node) {
+    pub fn generate(&mut self, node: &Node) {
         let data_type = node.data_type;
         let prefix = data_type.get_prefix();
+        self.instructions.clear();
 
         match &node.value_type {
             ValueType::Integer(value) => {
@@ -80,6 +115,12 @@ impl IrGenerator {
                 let reg = self.registers.allocate();
                 self.push_reg(reg);
                 self.push(format!("fmov %r{}, {};", reg, value));
+            }
+            ValueType::Text(value) => {
+                let reg = self.registers.allocate();
+                self.push_reg(reg);
+                let loc = self.get_string_location(&*value);
+                self.push(format!("smov %r{}, {};", reg, loc));
             }
             ValueType::BinOperator(op) => {
                 for child in &node.children {
@@ -153,6 +194,7 @@ impl IrGenerator {
                 }
                 let reg = self.pop_reg();
                 self.push(format!("{prefix}print %r{reg};"));
+                //self.push(format!("iprint %r{reg};"));
             }
             ValueType::Identifier(name) => {
                 if let Some(var_reg) = self.get_variable(name) {
@@ -178,7 +220,8 @@ impl IrGenerator {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ast::tree::{DataType, Node, NodeType, ValueType};
+    use crate::ast::tree::{Node, NodeType, ValueType};
+    use crate::datatypes::datatype::DataType;
     use crate::tokens::Location;
 
     #[test]

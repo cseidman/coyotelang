@@ -1,5 +1,5 @@
-use crate::ast::datatype::DataType;
 use crate::ast::tree::{NodeType, ValueType};
+use crate::datatypes::datatype::DataType;
 use crate::tokens::Location;
 use std::fmt::{Display, Formatter};
 

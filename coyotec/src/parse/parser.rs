@@ -1,10 +1,12 @@
 #![allow(dead_code, unused_variables, unused_imports)]
 use crate::ast::tree::ValueType::*;
-use crate::ast::tree::{BinOp, Command, DataType, Node, NodeType, UnaryOp, ValueType};
+use crate::ast::tree::{BinOp, Command, Node, NodeType, UnaryOp, ValueType};
+use crate::datatypes::datatype::DataType;
 /// The parser takes a vector of tokens from the lexer and builds the AST
 ///
 /// The parser is a recursive descent parser that builds the AST from the tokens
 use crate::tokens::{Location, Token, TokenType};
+
 use anyhow::{Error, Result};
 use std::slice::Iter;
 
@@ -13,9 +15,9 @@ use crate::symbols::{Symbol, SymbolTable};
 
 const PREVIOUS: usize = 0;
 const CURRENT: usize = 1;
-
+#[derive(Clone)]
 pub struct Parser<'a> {
-    tokens: Iter<'a, Token>,
+    pub tokens: Iter<'a, Token>,
     current: usize,            // The current token position being parsed
     symbol_table: SymbolTable, // A map of symbol names to location numbers
 }
@@ -27,6 +29,16 @@ impl<'a> Parser<'a> {
             tokens: tokens.iter(),
             current: 0,
             symbol_table: SymbolTable::new(),
+        }
+    }
+
+    pub fn add_tokens(&mut self, tokens: &'a [Token]) -> Self {
+        let s_table = self.symbol_table.clone();
+        Self {
+            // Iterators are used to avoid moving the vector of tokens
+            tokens: tokens.iter(),
+            current: 0,
+            symbol_table: s_table,
         }
     }
 
@@ -256,6 +268,15 @@ impl<'a> Parser<'a> {
                     ValueType::Float(value),
                     token.location,
                     DataType::Float,
+                    NodeType::Expr,
+                ))
+            }
+            TokenType::Text(value) => {
+                self.advance();
+                Some(Node::new(
+                    ValueType::Text(value),
+                    token.location,
+                    DataType::String,
                     NodeType::Expr,
                 ))
             }

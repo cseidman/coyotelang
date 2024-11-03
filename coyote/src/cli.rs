@@ -1,13 +1,25 @@
-#![allow(unused_variables)]
-use anyhow::Result;
+#![allow(unused_variables, unused_assignments)]
+
+use anyhow::{bail, Result};
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
+use std::slice::Iter;
 
 use clap::Parser;
 use colored::Colorize;
+use coyotec::ast::tree::{NodeType, ValueType};
+use coyotec::ast::Node;
 use coyotec::compiler::compile;
-use coyotec::lexer::SourceType;
+use coyotec::datatypes::datatype::DataType;
+use coyotec::generator::{generate, IrGenerator};
+use coyotec::lexer::{lex, SourceType};
+use coyotec::parse;
+use coyotec::parse::parser;
+use coyotec::parse::parser::parse;
+use coyotec::tokens::Token;
 use cvm::vm;
+use cvm::vm::Vm;
+use cyasm::assembler::assemble;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -79,14 +91,39 @@ fn repl() -> Result<()> {
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
     }
+
+    let mut vm = Vm::new();
+    let ast: Node = Node::new(
+        ValueType::Root,
+        Default::default(),
+        DataType::None,
+        NodeType::Leaf,
+    );
+    let mut generator = IrGenerator::new(&ast);
+    let mut parser = parser::Parser::new(&[]);
+    let mut tokens: Vec<Token> = Vec::new();
     loop {
         let readline = rl.readline(">> ");
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str())?;
                 println!("{} {}", "line:".red(), line.yellow());
-                if let Ok(bytecode) = compile(&line, SourceType::Interactive) {
-                    vm::execute(bytecode);
+                tokens = lex(&line, SourceType::Interactive)?;
+                let mut parser = parser.add_tokens(&tokens);
+                {
+                    if let Some(node) = parser.parse() {
+                        // Generate the assembly code
+                        generator.generate(&node);
+                        let asm = format!("{}", generator);
+                        println!("{}", asm);
+
+                        // Assemble the assembly code into bytecode
+                        let bytecode = assemble(&asm);
+                        vm.code = bytecode;
+                        vm.run()
+                    } else {
+                        bail!("Error parsing");
+                    }
                 }
             }
             Err(ReadlineError::Interrupted) => {

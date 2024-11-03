@@ -36,8 +36,72 @@ impl<'a> Parser<'a> {
         self.asm.next()
     }
 
+    pub fn match_string(&mut self, value: &str) -> bool {
+        let n = value.len();
+        if value == self.asm.clone().take(n).collect::<String>() {
+            (0..n).for_each(|_| {
+                self.advance();
+            });
+            true
+        } else {
+            false
+        }
+    }
+
+    fn get_line(&mut self) -> String {
+        let mut line = String::new();
+        while let Some(&c) = self.asm.peek() {
+            if c == '\n' {
+                self.advance();
+                break;
+            }
+            line.push(c);
+            self.advance();
+        }
+        line
+    }
+
+    fn write_constants(&mut self) {
+        // Load all the constants after the .constants directive
+        let mut const_count: u32 = 0;
+        loop {
+            let line = self.get_line();
+            let line = line.trim();
+            if line == ".end" {
+                break;
+            }
+            if line == "" {
+                continue;
+            }
+
+            // Add the count as 4 byte integer
+            //self.bytecode
+            //    .append(&mut const_count.to_le_bytes().to_vec());
+
+            // Add the length of the string as a 4 byte integer
+            let constant = line.trim();
+            let mut const_bytes = constant.as_bytes().to_vec();
+            let const_len: u32 = const_bytes.len() as u32;
+            self.bytecode.append(&mut const_len.to_le_bytes().to_vec());
+
+            // Add the string
+            self.bytecode.append(&mut const_bytes);
+            const_count += 1;
+        }
+        println!("Constant count: {}", const_count);
+        // Add the count of constants as the first 4 bytes
+        for b in const_count.to_be_bytes().to_vec() {
+            self.bytecode.insert(0, b);
+        }
+    }
+
     pub fn assemble(&mut self) -> Vec<u8> {
         while let Some(&c) = self.asm.peek() {
+            if self.match_string(".constants") {
+                self.write_constants();
+                continue;
+            }
+
             if c == '\n' {
                 self.advance();
                 self.line += 1;
@@ -47,6 +111,19 @@ impl<'a> Parser<'a> {
             if c.is_whitespace() || c == ',' || c == ';' {
                 self.advance();
                 continue;
+            }
+
+            if c == '"' {
+                let mut str_val = String::new();
+                self.advance();
+                while let Some(&chr) = self.asm.peek() {
+                    self.advance();
+                    if chr == '"' {
+                        break;
+                    } else {
+                        str_val.push(chr)
+                    }
+                }
             }
 
             if c.is_alphabetic() {
@@ -113,6 +190,11 @@ impl<'a> Parser<'a> {
         self.bytecode.append(&mut operand.to_vec());
     }
 
+    fn emit_string_operand(&mut self, operand: String) {
+        let mut bytes = operand.as_bytes().to_vec();
+        self.bytecode.append(&mut bytes);
+    }
+
     fn emit_register(&mut self, reg_number: u16) {
         let mut reg = reg_number.to_le_bytes().to_vec();
         self.bytecode.append(&mut reg);
@@ -127,6 +209,7 @@ impl<'a> Parser<'a> {
             "idiv" => Some(IDIV),
             "iequ" => Some(IEQU),
             "fmov" => Some(FMOV),
+            "smov" => Some(SMOV),
             "fadd" => Some(FADD),
             "fsub" => Some(FSUB),
             "fmul" => Some(FMUL),
@@ -136,8 +219,10 @@ impl<'a> Parser<'a> {
             "iinc" => Some(IINC),
             "store" => Some(STORE),
             "istore" => Some(ISTORE),
+            "sstore" => Some(SSTORE),
             "load" => Some(LOAD),
             "iprint" => Some(IPRINT),
+            "sprint" => Some(SPRINT),
             "ineg" => Some(INEG),
             _ => None,
         }

@@ -1,7 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
-pub use crate::ast::{datatype::DataType, Node};
-
+pub use crate::ast::Node;
 use std::fmt::{Display, Formatter};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -15,11 +14,18 @@ pub enum ValueType {
     Root,
     Integer(i64),
     Float(f64),
+    Text(Box<String>),
     BinOperator(BinOp),
     UnaryOperator(UnaryOp),
     Identifier(String),
     Statement(Command),
     AssignmentOperator,
+}
+
+impl ValueType {
+    pub(crate) fn Text(text: Box<String>) -> ValueType {
+        todo!()
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -37,6 +43,9 @@ impl Display for ValueType {
                 write!(f, "{value}")
             }
             ValueType::Float(value) => {
+                write!(f, "{value}")
+            }
+            ValueType::Text(value) => {
                 write!(f, "{value}")
             }
             ValueType::BinOperator(value) => {

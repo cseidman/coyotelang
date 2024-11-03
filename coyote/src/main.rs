@@ -1,3 +1,5 @@
+extern crate core;
+
 mod cli;
 
 fn main() {
@@ -5,4 +7,3 @@ fn main() {
         println!("Error: {}", e);
     }
 }
-

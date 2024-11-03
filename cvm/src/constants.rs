@@ -18,8 +18,11 @@ pub const IINC: u8 = 16;
 pub const ISTORE: u8 = 17; // Store an integer constant in a register
 pub const IPRINT: u8 = 18;
 pub const INEG: u8 = 19;
+pub const SPRINT: u8 = 20;
+pub const SMOV: u8 = 21;
+pub const SSTORE: u8 = 22;
 
-pub const INSTRUCTIONS: [&str; 20] = [
+pub const INSTRUCTIONS: [&str; 23] = [
     "HALT", "IMOV", "IADD", "ISUB", "IMUL", "IDIV", "IEQU", "FMOV", "FADD", "FSUB", "FMUL", "FDIV",
-    "STORE", "LOAD", "IDEC", "CMP", "IINC", "ISTORE", "IPRINT", "INEG",
+    "STORE", "LOAD", "IDEC", "CMP", "IINC", "ISTORE", "IPRINT", "INEG", "SPRINT", "SMOV", "SSTORE",
 ];

@@ -3,7 +3,7 @@
 // nor do the numbers have any meaning other than being unique. This is a way to avoid carrying
 // strings in emums and avoiding clones
 
-use crate::ast::tree::DataType;
+use crate::datatypes::datatype::DataType;
 use std::collections::HashMap;
 #[derive(Clone)]
 pub struct Item {
@@ -14,7 +14,7 @@ impl Item {
         Self { data_type }
     }
 }
-
+#[derive(Clone)]
 pub struct Symbol {
     pub symbols: HashMap<String, Item>,
     pub register: Option<usize>,
@@ -40,6 +40,7 @@ impl Symbol {
 }
 
 /// A symbol table is a collection of symbol names. Each symbol name is a map of identifier
+#[derive(Clone)]
 pub struct SymbolTable {
     pub symbols: Vec<Symbol>,
     scope: usize,
