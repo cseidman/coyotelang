@@ -12,7 +12,6 @@ pub fn compile(code: &str, source_type: SourceType) -> Result<Vec<u8>> {
     let mut bytecode = Vec::new();
     let tokens = lex(code, source_type)?;
 
-    //let node = parse(&tokens);
     // Parse the tokens
     if let Some(node) = parse(tokens) {
         // Generate the assembly code

@@ -70,7 +70,6 @@ impl Vm {
         println!("Loading constants");
         self.ip = 0;
         self.load_constants();
-
         println!("Executing code ..");
 
         macro_rules! ibinop {

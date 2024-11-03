@@ -22,7 +22,7 @@ pub struct IrGenerator {
 
 pub fn generate(node: &Node) -> String {
     let mut generator = IrGenerator::new(node);
-    generator.generate(node);
+    generator.generate_code(node);
     format!("{}", generator)
 }
 
@@ -54,6 +54,12 @@ impl IrGenerator {
             scope: 0,
             symbol_regs: vec![HashMap::new()],
         }
+    }
+
+    /// Clear the instructions. This is useful for REPLs where we're keeping a reference to the
+    /// generator, but we need to clear the instructions before each run
+    pub fn clear(&mut self) {
+        self.instructions.clear()
     }
 
     fn get_string_location(&mut self, string: &str) -> usize {
@@ -101,9 +107,13 @@ impl IrGenerator {
     }
 
     pub fn generate(&mut self, node: &Node) {
+        self.clear();
+        self.generate_code(node);
+    }
+
+    fn generate_code(&mut self, node: &Node) {
         let data_type = node.data_type;
         let prefix = data_type.get_prefix();
-        self.instructions.clear();
 
         match &node.value_type {
             ValueType::Integer(value) => {
@@ -124,7 +134,7 @@ impl IrGenerator {
             }
             ValueType::BinOperator(op) => {
                 for child in &node.children {
-                    self.generate(child);
+                    self.generate_code(child);
                 }
                 // The binary operator will have a register for each child
                 // and the result will be stored in the first register
@@ -153,7 +163,7 @@ impl IrGenerator {
             }
             ValueType::UnaryOperator(op) => {
                 for child in &node.children {
-                    self.generate(child);
+                    self.generate_code(child);
                 }
                 // The unary operator will have a register for the child
                 // and the result will be stored in the same register
@@ -179,7 +189,7 @@ impl IrGenerator {
                 // Check of the next child in an assignment operator
                 let next_node = &node.children[0];
                 if next_node.value_type == ValueType::AssignmentOperator {
-                    self.generate(&node.children[1]);
+                    self.generate_code(&node.children[1]);
 
                     // Assign a register to the identifier and store it
                     let sreg = self.store_variable(identifier_name);
@@ -190,7 +200,7 @@ impl IrGenerator {
             }
             ValueType::Statement(command) if *command == Command::Print => {
                 for c in &node.children {
-                    self.generate(c);
+                    self.generate_code(c);
                 }
                 let reg = self.pop_reg();
                 self.push(format!("{prefix}print %r{reg};"));
@@ -208,7 +218,7 @@ impl IrGenerator {
 
             ValueType::Root => {
                 for child in &node.children {
-                    self.generate(child);
+                    self.generate_code(child);
                 }
             }
 

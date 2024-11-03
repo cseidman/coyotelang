@@ -26,7 +26,7 @@ impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         Self {
             // Iterators are used to avoid moving the vector of tokens
-            tokens: tokens,
+            tokens,
             current: 0,
             symbol_table: SymbolTable::new(),
         }
