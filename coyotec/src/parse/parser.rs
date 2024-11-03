@@ -16,47 +16,42 @@ use crate::symbols::{Symbol, SymbolTable};
 const PREVIOUS: usize = 0;
 const CURRENT: usize = 1;
 #[derive(Clone)]
-pub struct Parser<'a> {
-    pub tokens: Iter<'a, Token>,
+pub struct Parser {
+    pub tokens: Vec<Token>,
     current: usize,            // The current token position being parsed
     symbol_table: SymbolTable, // A map of symbol names to location numbers
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(tokens: &'a [Token]) -> Self {
+impl Parser {
+    pub fn new(tokens: Vec<Token>) -> Self {
         Self {
             // Iterators are used to avoid moving the vector of tokens
-            tokens: tokens.iter(),
+            tokens: tokens,
             current: 0,
             symbol_table: SymbolTable::new(),
         }
     }
 
-    pub fn add_tokens(&mut self, tokens: &'a [Token]) -> Self {
-        let s_table = self.symbol_table.clone();
-        Self {
-            // Iterators are used to avoid moving the vector of tokens
-            tokens: tokens.iter(),
-            current: 0,
-            symbol_table: s_table,
-        }
+    pub fn add_tokens(&mut self, tokens: Vec<Token>) {
+        self.tokens = tokens;
+        self.current = 0;
     }
 
     /// Advance the token iterator and return the next token. If there are no more tokens
     /// return `None`
     pub fn advance(&mut self) -> Option<Token> {
-        self.current += 1;
-        if let Some(token) = self.tokens.next() {
-            return Some(token.clone());
+        let current = self.current;
+        if current < self.tokens.len() {
+            self.current += 1;
+            return Some(self.tokens[current].clone());
         }
         None
     }
     /// Peek at the next token without advancing the iterator
     pub fn peek(&mut self) -> Option<Token> {
-        // We need to clone the token because so as not to advance the token
-        // iterator on the "real" vector of tokens
-        if let Some(token) = self.tokens.clone().next() {
-            return Some(token.clone());
+        let current = self.current;
+        if current < self.tokens.len() {
+            return Some(self.tokens[current].clone());
         }
         None
     }
@@ -390,6 +385,6 @@ impl<'a> Parser<'a> {
         Some(node)
     }
 }
-pub fn parse(tokens: &[Token]) -> Option<Node> {
+pub fn parse(tokens: Vec<Token>) -> Option<Node> {
     Parser::new(tokens).parse()
 }

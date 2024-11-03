@@ -14,7 +14,7 @@ pub fn compile(code: &str, source_type: SourceType) -> Result<Vec<u8>> {
 
     //let node = parse(&tokens);
     // Parse the tokens
-    if let Some(node) = parse(&tokens) {
+    if let Some(node) = parse(tokens) {
         // Generate the assembly code
         let asm = generate(&node);
         println!("{}", asm);

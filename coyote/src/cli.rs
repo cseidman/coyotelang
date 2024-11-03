@@ -100,7 +100,7 @@ fn repl() -> Result<()> {
         NodeType::Leaf,
     );
     let mut generator = IrGenerator::new(&ast);
-    let mut parser = parser::Parser::new(&[]);
+    let mut parser = parser::Parser::new(vec![]);
     let mut tokens: Vec<Token> = Vec::new();
     loop {
         let readline = rl.readline(">> ");
@@ -109,7 +109,7 @@ fn repl() -> Result<()> {
                 rl.add_history_entry(line.as_str())?;
                 println!("{} {}", "line:".red(), line.yellow());
                 tokens = lex(&line, SourceType::Interactive)?;
-                let mut parser = parser.add_tokens(&tokens);
+                parser.add_tokens(tokens);
                 {
                     if let Some(node) = parser.parse() {
                         // Generate the assembly code
