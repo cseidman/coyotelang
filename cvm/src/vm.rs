@@ -54,6 +54,7 @@ impl Vm {
     }
 
     fn load_constants(&mut self) {
+        self.string_pool.clear();
         let num_constants = u32::from_le_bytes(self.code[0..4].try_into().unwrap());
         self.ip += 4;
         for _ in 0..num_constants {
@@ -127,29 +128,27 @@ impl Vm {
                     println!("R{}, R{};", reg, value);
                 }
 
-                IMOV => {
+                ICONST => {
                     let reg = self.get_register_location();
                     let value = self.get_data().as_integer();
                     self.registers[reg].i = value;
                     println!("R{}, {};", reg, value);
                 }
 
-                FMOV => {
+                FCONST => {
                     let reg = self.get_register_location();
                     let value = self.get_data().as_float();
                     self.registers[reg].f = value;
                 }
 
-                SMOV => {
+                SCONST => {
                     // Get the target register
                     let reg = self.get_register_location();
                     // Get the index of the string in the string pool
-                    let index = self.get_data().as_index() as usize;
+                    let index = self.get_data().as_index();
                     // Get the string from the string pool
-                    let string = &self.string_pool[index];
-                    // Store the string in the heap
-                    let ptr = self.heap.store(string.as_bytes().to_vec());
-                    self.registers[reg].ptr = ptr.cast_mut();
+
+                    self.registers[reg].index = index;
                 }
 
                 IADD => {
@@ -186,10 +185,16 @@ impl Vm {
                     println!("R{reg}");
                     println!("\t{value}");
                 }
+                FPRINT => {
+                    let reg = self.get_register_location();
+                    let value = self.registers[reg].as_float();
+                    println!("R{reg}");
+                    println!("\t{value}");
+                }
                 SPRINT => {
                     let reg = self.get_register_location();
-                    let ptr = self.registers[reg].as_ptr();
-                    let value = self.heap.as_string(ptr);
+                    let index = self.registers[reg].as_index() as usize;
+                    let value = self.string_pool[index].clone();
 
                     println!("R{reg}");
                     println!("\t{value}");

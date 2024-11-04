@@ -62,6 +62,7 @@ impl IrGenerator {
         self.instructions.clear()
     }
 
+    /// Get the location of a string in the string pool. If the string is not found, it will be added
     fn get_string_location(&mut self, string: &str) -> usize {
         for (i, s) in self.string_pool.iter().enumerate() {
             if s == string {
@@ -119,18 +120,18 @@ impl IrGenerator {
             ValueType::Integer(value) => {
                 let reg = self.registers.allocate();
                 self.push_reg(reg);
-                self.push(format!("imov %r{}, {};", reg, value));
+                self.push(format!("iconst %r{}, {};", reg, value));
             }
             ValueType::Float(value) => {
                 let reg = self.registers.allocate();
                 self.push_reg(reg);
-                self.push(format!("fmov %r{}, {};", reg, value));
+                self.push(format!("fconst %r{}, {};", reg, value));
             }
             ValueType::Text(value) => {
                 let reg = self.registers.allocate();
                 self.push_reg(reg);
                 let loc = self.get_string_location(&*value);
-                self.push(format!("smov %r{}, {};", reg, loc));
+                self.push(format!("sconst %r{}, {};", reg, loc));
             }
             ValueType::BinOperator(op) => {
                 for child in &node.children {

@@ -224,6 +224,10 @@ impl<'a> Parser<'a> {
             "iprint" => Some(IPRINT),
             "sprint" => Some(SPRINT),
             "ineg" => Some(INEG),
+            "iconst" => Some(ICONST),
+            "fconst" => Some(FCONST),
+            "sconst" => Some(SCONST),
+            "fprint" => Some(FPRINT),
             _ => None,
         }
     }
