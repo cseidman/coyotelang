@@ -218,16 +218,14 @@ impl<'a> Parser<'a> {
             "cmp" => Some(CMP),
             "iinc" => Some(IINC),
             "store" => Some(STORE),
-            "istore" => Some(ISTORE),
-            "sstore" => Some(SSTORE),
             "load" => Some(LOAD),
             "iprint" => Some(IPRINT),
             "sprint" => Some(SPRINT),
+            "fprint" => Some(FPRINT),
             "ineg" => Some(INEG),
             "iconst" => Some(ICONST),
             "fconst" => Some(FCONST),
             "sconst" => Some(SCONST),
-            "fprint" => Some(FPRINT),
             _ => None,
         }
     }

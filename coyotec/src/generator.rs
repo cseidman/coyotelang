@@ -196,7 +196,7 @@ impl IrGenerator {
                     let sreg = self.store_variable(identifier_name);
                     let reg = self.pop_reg();
 
-                    self.push(format!("{prefix}store %r{sreg}, %r{reg};",));
+                    self.push(format!("store %r{sreg}, %r{reg};",));
                 }
             }
             ValueType::Statement(command) if *command == Command::Print => {

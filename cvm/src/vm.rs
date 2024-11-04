@@ -103,22 +103,9 @@ impl Vm {
             match b {
                 STORE => {
                     let reg = self.get_register_location();
-                    let value = self.read_register_value();
-                    self.registers[reg] = value;
-                    println!("R{}, {};", reg, value.as_integer());
-                }
-                ISTORE => {
-                    let dest = self.get_register_location();
                     let value = self.get_register_location();
-                    self.registers[dest] = self.registers[value];
-                    println!("R{}, R{};", dest, value);
-                }
-
-                SSTORE => {
-                    let dest = self.get_register_location();
-                    let value = self.get_register_location();
-                    self.registers[dest] = self.registers[value];
-                    println!("R{}, R{};", dest, value);
+                    self.registers[reg] = self.registers[value];
+                    println!("R{}, {};", reg, value);
                 }
 
                 LOAD => {
