@@ -166,6 +166,10 @@ impl Vm {
                     let reg = self.get_register_location();
                     self.registers[reg].i = -self.registers[reg].as_integer();
                 }
+                FNEG => {
+                    let reg = self.get_register_location();
+                    self.registers[reg].f = -self.registers[reg].as_float();
+                }
                 IPRINT => {
                     let reg = self.get_register_location();
                     let value = self.registers[reg].as_integer();

@@ -205,7 +205,6 @@ impl IrGenerator {
                 }
                 let reg = self.pop_reg();
                 self.push(format!("{prefix}print %r{reg};"));
-                //self.push(format!("iprint %r{reg};"));
             }
             ValueType::Identifier(name) => {
                 if let Some(var_reg) = self.get_variable(name) {
@@ -225,74 +224,5 @@ impl IrGenerator {
 
             _ => {}
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::ast::tree::{Node, NodeType, ValueType};
-    use crate::datatypes::datatype::DataType;
-    use crate::tokens::Location;
-
-    #[test]
-    fn test_ir_generator() {
-        let mut node = Node::new(
-            ValueType::BinOperator(BinOp::Add),
-            Location::new(),
-            DataType::Integer,
-            NodeType::Op,
-        );
-        let left = Node::new(
-            ValueType::Integer(10),
-            Location::new(),
-            DataType::Integer,
-            NodeType::Leaf,
-        );
-        let right = Node::new(
-            ValueType::Integer(20),
-            Location::new(),
-            DataType::Integer,
-            NodeType::Leaf,
-        );
-        node.add_child(left);
-        node.add_child(right);
-
-        let mut node3 = Node::new(
-            ValueType::BinOperator(BinOp::Add),
-            Location::new(),
-            DataType::Integer,
-            NodeType::Op,
-        );
-        let left3 = Node::new(
-            ValueType::Integer(30),
-            Location::new(),
-            DataType::Integer,
-            NodeType::Leaf,
-        );
-        let right3 = Node::new(
-            ValueType::Integer(40),
-            Location::new(),
-            DataType::Integer,
-            NodeType::Leaf,
-        );
-        node3.add_child(left3);
-        node3.add_child(right3);
-
-        let mut node2 = Node::new(
-            ValueType::BinOperator(BinOp::Add),
-            Location::new(),
-            DataType::Integer,
-            NodeType::Op,
-        );
-
-        node2.add_child(node3.clone());
-        node2.add_child(node.clone());
-
-        let instructions = generate(&node2);
-        //assert_eq!(instructions.len(), 3);
-        instructions.iter().for_each(|instruction| {
-            println!("{}", instruction);
-        });
     }
 }

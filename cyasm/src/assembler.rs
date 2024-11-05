@@ -223,6 +223,7 @@ impl<'a> Parser<'a> {
             "sprint" => Some(SPRINT),
             "fprint" => Some(FPRINT),
             "ineg" => Some(INEG),
+            "fneg" => Some(FNEG),
             "iconst" => Some(ICONST),
             "fconst" => Some(FCONST),
             "sconst" => Some(SCONST),
@@ -260,7 +261,7 @@ mod test {
         imov %r2, 1 ;
         iadd %r1, %r2 ;
         iadd %r0, %r1 ;
-        istore %r3, %r0 ;
+        store %r3, %r0 ;
         imov %r4, 10 ;
         iadd %r4, %r3 ;
         "#;
@@ -269,7 +270,7 @@ mod test {
         let expected = vec![
             IMOV, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, IMOV, 1, 0, 3, 0, 0, 0, 0, 0, 0, 0, IMOV, 2, 0, 2,
             0, 0, 0, 0, 0, 0, 0, IMUL, 1, 0, 2, 0, IMOV, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, IADD, 1, 0,
-            2, 0, IADD, 0, 0, 1, 0, ISTORE, 3, 0, 0, 0, IMOV, 4, 0, 10, 0, 0, 0, 0, 0, 0, 0, IADD,
+            2, 0, IADD, 0, 0, 1, 0, STORE, 3, 0, 0, 0, IMOV, 4, 0, 10, 0, 0, 0, 0, 0, 0, 0, IADD,
             4, 0, 3, 0, 0,
         ];
         assert_eq!(byte_code, expected);

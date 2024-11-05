@@ -13,7 +13,7 @@ pub fn compile(code: &str, source_type: SourceType) -> Result<Vec<u8>> {
     let tokens = lex(code, source_type)?;
 
     // Parse the tokens
-    if let Some(node) = parse(tokens) {
+    if let Ok(node) = parse(tokens, code.to_string()) {
         // Generate the assembly code
         let asm = generate(&node);
         println!("{}", asm);

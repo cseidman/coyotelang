@@ -23,9 +23,10 @@ pub const ICONST: u8 = 21;
 pub const FCONST: u8 = 22;
 pub const SCONST: u8 = 23;
 pub const FPRINT: u8 = 24;
+pub const FNEG: u8 = 25;
 
-pub const INSTRUCTIONS: [&str; 25] = [
+pub const INSTRUCTIONS: [&str; 26] = [
     "HALT", "IMOV", "IADD", "ISUB", "IMUL", "IDIV", "IEQU", "FMOV", "FADD", "FSUB", "FMUL", "FDIV",
     "STORE", "LOAD", "IDEC", "CMP", "IINC", "IPRINT", "INEG", "SPRINT", "SMOV", "ICONST", "FCONST",
-    "SCONST", "FPRINT",
+    "SCONST", "FPRINT", "FNEG",
 ];
