@@ -1,6 +1,8 @@
 #![allow(dead_code)]
+
 use crate::heap::Heap;
 use crate::{constants::*, valuetypes::Value};
+use std::collections::HashMap;
 
 type Register = Value;
 
@@ -102,40 +104,44 @@ impl Vm {
             print!("{} ", INSTRUCTIONS[b as usize]);
             match b {
                 STORE => {
-                    let reg = self.get_register_location();
-                    let value = self.get_register_location();
-                    self.registers[reg] = self.registers[value];
-                    println!("R{}, {};", reg, value);
+                    self.store();
                 }
 
                 LOAD => {
-                    let reg = self.get_register_location();
-                    let value = self.get_register_location();
-                    self.registers[reg] = self.registers[value];
-                    println!("R{}, R{};", reg, value);
+                    self.load();
                 }
 
                 ICONST => {
-                    let reg = self.get_register_location();
-                    let value = self.get_data().as_integer();
-                    self.registers[reg].i = value;
-                    println!("R{}, {};", reg, value);
+                    self.iconst();
                 }
 
                 FCONST => {
-                    let reg = self.get_register_location();
-                    let value = self.get_data().as_float();
-                    self.registers[reg].f = value;
+                    self.fconst();
                 }
 
                 SCONST => {
-                    // Get the target register
+                    self.sconst();
+                }
+                AICONST => {
                     let reg = self.get_register_location();
-                    // Get the index of the string in the string pool
-                    let index = self.get_data().as_index();
-                    // Get the string from the string pool
-
-                    self.registers[reg].index = index;
+                    let array_size = self.get_data().as_uint();
+                    let mut array: HashMap<usize, Value> = HashMap::with_capacity(array_size);
+                    for i in 0..array_size {
+                        let value = self.get_data();
+                        array.insert(i, value);
+                    }
+                    let ptr = self.heap.store(array);
+                    self.registers[reg].ptr = ptr;
+                }
+                AFCONST => {
+                    let reg = self.get_register_location();
+                    let value = self.get_data().as_index();
+                    self.registers[reg].index = value;
+                }
+                ASCONST => {
+                    let reg = self.get_register_location();
+                    let value = self.get_data().as_index();
+                    self.registers[reg].index = value;
                 }
 
                 IADD => {
@@ -171,14 +177,15 @@ impl Vm {
                     self.registers[reg].f = -self.registers[reg].as_float();
                 }
                 IPRINT => {
-                    let reg = self.get_register_location();
-                    let value = self.registers[reg].as_integer();
-                    println!("R{reg}");
-                    println!("\t{value}");
+                    self.iprint();
+                }
+                IAPRINT => {
+                    self.iaprint();
                 }
                 FPRINT => {
                     let reg = self.get_register_location();
                     let value = self.registers[reg].as_float();
+
                     println!("R{reg}");
                     println!("\t{value}");
                 }
@@ -190,6 +197,7 @@ impl Vm {
                     println!("R{reg}");
                     println!("\t{value}");
                 }
+
                 HALT => {
                     println!();
                     break;
@@ -207,6 +215,52 @@ impl Vm {
         }
 
         //println!("{}", self.registers[0].as_integer());
+    }
+
+    fn iprint(&mut self) {
+        let reg = self.get_register_location();
+        let value = self.registers[reg].as_integer();
+
+        println!("R{reg}");
+        println!("\t{value}");
+    }
+
+    fn iaprint(&mut self) {}
+
+    fn sconst(&mut self) {
+        // Get the target register
+        let reg = self.get_register_location();
+        // Get the index of the string in the string pool
+        let index = self.get_data().as_index();
+        // Get the string from the string pool
+
+        self.registers[reg].index = index;
+    }
+
+    fn fconst(&mut self) {
+        let reg = self.get_register_location();
+        let value = self.get_data().as_float();
+        self.registers[reg].f = value;
+    }
+
+    fn load(&mut self) {
+        let reg = self.get_register_location();
+        let value = self.get_register_location();
+        self.registers[reg] = self.registers[value];
+        println!("R{}, R{};", reg, value);
+    }
+
+    fn store(&mut self) {
+        let reg = self.get_register_location();
+        let value = self.get_register_location();
+        self.registers[reg] = self.registers[value];
+        println!("R{}, {};", reg, value);
+    }
+    fn iconst(&mut self) {
+        let reg = self.get_register_location();
+        let value = self.get_data().as_integer();
+        self.registers[reg].i = value;
+        println!("R{}, {};", reg, value);
     }
 }
 
@@ -237,7 +291,7 @@ mod test {
     fn test_vm_let() {
         let mut vm = Vm::new();
         vm.code = vec![
-            ISTORE, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, ISTORE, 1, 0, 3, 0, 0, 0, 0, 0, 0, 0, IADD, 0, 0,
+            STORE, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, STORE, 1, 0, 3, 0, 0, 0, 0, 0, 0, 0, IADD, 0, 0,
             1, 0, HALT,
         ];
         vm.run();

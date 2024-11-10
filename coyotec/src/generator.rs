@@ -216,6 +216,22 @@ impl IrGenerator {
                 }
             }
 
+            ValueType::Array => {
+                // This is the register where the array is stored
+                let reg = self.registers.allocate();
+                // Save the array register for later
+                self.push_reg(reg);
+                // Get the count of elements
+                let count = node.children.len();
+                self.push(format!("a{prefix}const %r{reg}, {count}"));
+                for child in &node.children {
+                    self.generate_code(child);
+                    let source_reg = self.pop_reg();
+                    self.registers.free_register(source_reg);
+                    self.push(format!("{prefix}mova %r{reg}, %r{source_reg}"));
+                }
+            }
+
             ValueType::Root => {
                 for child in &node.children {
                     self.generate_code(child);

@@ -221,10 +221,10 @@ impl Parser {
                         node.add_child(n);
                     } else {
                         bail!("Unexpected token {:?}", token.token_type);
-                        //self.advance();
                     }
                 }
             };
+            self.advance();
         }
         Ok(node)
     }
@@ -257,6 +257,36 @@ impl Parser {
         Ok(expr)
     }
 
+    /// Array
+    fn array(&mut self) -> Result<Option<Node>> {
+        let current = self.current;
+        let mut a_node = Node::new(
+            ValueType::Array,
+            self.tokens[current].location,
+            DataType::None,
+            NodeType::Expr,
+        );
+        let mut elem_count = 0;
+        loop {
+            if self.match_token(TokenType::RBracket) {
+                break;
+            }
+            let expr = self.parse_expr()?;
+            a_node.add_child(expr.unwrap());
+            elem_count += 1;
+            if self.match_token(TokenType::Comma) {
+                continue;
+            }
+        }
+        let data_type = if elem_count > 0 {
+            a_node.children[0].data_type
+        } else {
+            DataType::None
+        };
+        a_node.data_type = data_type;
+        Ok(Some(a_node))
+    }
+
     /// Parse a primary expression which is either a number, a unary operator, or a grouping
     fn parse_primary(&mut self) -> Result<Option<Node>> {
         // Check for a unary operator
@@ -273,6 +303,10 @@ impl Parser {
         // Check for a grouping
         if self.match_token(TokenType::LParen) {
             return self.grouping();
+        }
+
+        if self.match_token(TokenType::LBracket) {
+            return self.array();
         }
 
         let node = match token.token_type {
@@ -391,12 +425,7 @@ impl Parser {
 
         loop {
             // If the next peeked value is None, then we're done
-            let nvalue = self.peek();
-            let token = if nvalue.is_none() {
-                break;
-            } else {
-                self.peek().unwrap()
-            };
+            let token = self.peek().expect("No expression token found");
 
             let op = match token.token_type {
                 TokenType::Plus => BinOp::Add,
@@ -411,7 +440,6 @@ impl Parser {
                 self.raise_error("Missing right side of expression");
                 bail!("parse error");
             }
-
             let right = right.unwrap();
 
             let rdata_type = right.clone().data_type;
@@ -426,6 +454,7 @@ impl Parser {
 
             let mut new_node =
                 Node::new(BinOperator(op), token.location, rdata_type, NodeType::Leaf);
+
             new_node.add_child(right);
             new_node.add_child(node.unwrap());
             node = Some(new_node);

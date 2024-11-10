@@ -1,75 +1,79 @@
 #![allow(unused_macros, dead_code)]
-use std::collections::HashMap;
+use crate::valuetypes::Value;
+use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
 
-macro_rules! heap_type {
-    ($name:ident, $value:expr, $val_type:tt) => {
-        pub const $name: *mut u8 = $value.as_mut_ptr();
-    };
-}
-
+#[derive(Clone)]
 pub struct Heap {
-    pub heap: HashMap<*const u8, Vec<u8>>,
-    pub next_id: usize,
+    pub heap: HashSet<*const u8>,
 }
 
 impl Heap {
     pub fn new() -> Self {
         Self {
-            heap: HashMap::with_capacity(1000),
-            next_id: 0,
+            heap: HashSet::with_capacity(1000),
         }
     }
 
-    pub fn store(&mut self, heap_data: Vec<u8>) -> *const u8 {
-        let ptr = heap_data.as_ptr();
-        self.heap.insert(ptr, heap_data);
+    pub fn store<T>(&mut self, data: T) -> *const u8 {
+        let ptr = Box::into_raw(Box::new(data)) as *const u8;
+        self.heap.insert(ptr);
         ptr
     }
 
-    pub fn get_val(&mut self, ptr: *const u8) -> Vec<u8> {
-        self.heap.get(&ptr).unwrap().to_vec()
-    }
-
-    pub fn as_string(&mut self, ptr: *const u8) -> String {
-        let bytes = self.get_val(ptr);
-        String::from_utf8(bytes.to_vec()).unwrap()
-    }
-    pub fn as_integer(&mut self, ptr: *const u8) -> i64 {
-        let bytes = self.get_val(ptr);
-        i64::from_be_bytes(bytes.try_into().unwrap())
-    }
-
-    pub fn as_float(&mut self, ptr: *const u8) -> f64 {
-        let bytes = self.get_val(ptr);
-        f64::from_be_bytes(bytes.try_into().unwrap())
+    pub fn free_entry(&mut self, index: *const u8) {
+        if self.heap.contains(&index) {
+            unsafe {
+                // Convert the raw pointer back into a Box to safely deallocate it
+                let _ = Box::from_raw(index as *mut u8);
+            }
+            // Remove the pointer from the vector to avoid a dangling pointer
+            self.heap.remove(&index);
+        } else {
+            println!("Value not found in heap");
+        }
     }
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
-    use crate::valuetypes::Value;
 
     #[test]
     fn test_heap() {
         let mut heap = Heap::new();
-        let mut toast = "Toast".to_string();
-        let val: Value = Value {
-            ptr: toast.as_mut_ptr(),
+        let data = 10;
+        let ptr = heap.store(data);
+        let num = unsafe { *(ptr as *const i32) };
+        assert_eq!(num, data);
+        heap.free_entry(ptr);
+    }
+
+    #[test]
+    fn test_heap_array() {
+        #[repr(C)]
+        struct Array {
+            atype: u8,
+            data: HashMap<u8, u8>,
+        }
+
+        let a = Array {
+            atype: 8,
+            data: HashMap::from([(1, 10), (2, 20)]),
         };
-        // Stora a string on the heap
-        let ptr = heap.store(unsafe { toast.as_bytes().to_vec() });
 
-        let new_toast = heap.as_string(ptr);
+        let aptr = &a as *const Array as *const u8;
+        let num_bytes = std::mem::size_of::<u8>(); // Number of bytes to read (for `atype` field in this case)
+        let bytes = unsafe { std::slice::from_raw_parts(aptr, 1) };
 
-        assert_eq!(new_toast, toast);
+        println!("Bytes: {:?}", bytes);
 
-        let mut num = 42;
-        let val: Value = Value { i: num };
-        // Store an integer on the heap
-        let ptr = heap.store(unsafe { num.to_be_bytes().to_vec() });
-        // Retrieve the integer from the heap
-        let new_num = heap.as_integer(ptr);
-        assert_eq!(new_num, num);
+        let b: HashMap<u8, u8> = HashMap::from([(1, 10), (2, 20)]);
+
+        let mut heap = Heap::new();
+        let ptr = heap.store(a);
+        let num = unsafe { &*(ptr as *const Array) };
+        assert_eq!(b[&2], 20);
+        heap.free_entry(ptr);
     }
 }

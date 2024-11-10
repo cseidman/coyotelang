@@ -20,6 +20,7 @@ pub enum ValueType {
     Identifier(String),
     Statement(Command),
     AssignmentOperator,
+    Array,
 }
 
 impl ValueType {
@@ -63,6 +64,9 @@ impl Display for ValueType {
             },
             ValueType::AssignmentOperator => {
                 write!(f, "AssignmentOperator")
+            }
+            ValueType::Array => {
+                write!(f, "Array")
             }
             ValueType::Root => {
                 write!(f, "Root")

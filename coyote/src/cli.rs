@@ -3,7 +3,6 @@
 use anyhow::{bail, Result};
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
-use std::slice::Iter;
 
 use clap::Parser;
 use colored::Colorize;
@@ -11,11 +10,9 @@ use coyotec::ast::tree::{NodeType, ValueType};
 use coyotec::ast::Node;
 use coyotec::compiler::compile;
 use coyotec::datatypes::datatype::DataType;
-use coyotec::generator::{generate, IrGenerator};
+use coyotec::generator::IrGenerator;
 use coyotec::lexer::{lex, SourceType};
-use coyotec::parse;
 use coyotec::parse::parser;
-use coyotec::parse::parser::parse;
 use coyotec::tokens::Token;
 use cvm::vm;
 use cvm::vm::Vm;
@@ -108,6 +105,9 @@ fn repl<'a>() -> Result<()> {
             Ok(line) => {
                 rl.add_history_entry(line.as_str())?;
                 println!("{} {}", "line:".red(), line.yellow());
+                if line == "exit" || line == "quit" || line == "/q" {
+                    break;
+                }
                 tokens = lex(&line, SourceType::Interactive)?;
                 parser.add_tokens(tokens, line);
 

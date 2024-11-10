@@ -227,6 +227,13 @@ impl<'a> Parser<'a> {
             "iconst" => Some(ICONST),
             "fconst" => Some(FCONST),
             "sconst" => Some(SCONST),
+            "aiconst" => Some(AICONST),
+            "afconst" => Some(AFCONST),
+            "asconst" => Some(ASCONST),
+            "imova" => Some(IMOVA),
+            "fmova" => Some(FMOVA),
+            "smova" => Some(SMOVA),
+            "iaprint" => Some(IAPRINT),
             _ => None,
         }
     }
