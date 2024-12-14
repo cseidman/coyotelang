@@ -23,4 +23,17 @@ impl DataType {
             DataType::None => "n",
         }
     }
+
+    pub fn get_vm_type(&self) -> u8 {
+        match self {
+            DataType::Integer => 6,
+            DataType::Float => 1,
+            DataType::Boolean => 2,
+            DataType::String => 3,
+            DataType::Array => 3,
+            DataType::Function => 3,
+            DataType::Struct(_) => 3,
+            DataType::None => 0,
+        }
+    }
 }

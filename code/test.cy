@@ -1,7 +1,2 @@
-let x = 5 + 6
-print x
-let y = 2 * 8
-print y
-print x + y
-
-
+let x = [10,20,30]
+print x[1]

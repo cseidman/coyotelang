@@ -175,7 +175,7 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
                 _ => lexer.make_token(TokenType::Identifier(Box::new(ident))),
             };
             tokens.push(tok);
-            lexer.advance();
+            //lexer.advance();
             continue;
         }
 

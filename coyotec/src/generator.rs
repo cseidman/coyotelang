@@ -115,6 +115,7 @@ impl IrGenerator {
     fn generate_code(&mut self, node: &Node) {
         let data_type = node.data_type;
         let prefix = data_type.get_prefix();
+        let vm_data_type = data_type.get_vm_type();
 
         match &node.value_type {
             ValueType::Integer(value) => {
@@ -204,13 +205,33 @@ impl IrGenerator {
                     self.generate_code(c);
                 }
                 let reg = self.pop_reg();
+                let prefix = {
+                    if ValueType::Array == node.children[0].value_type {
+                        &format!("{}a", prefix)
+                    } else {
+                        prefix
+                    }
+                };
                 self.push(format!("{prefix}print %r{reg};"));
             }
             ValueType::Identifier(name) => {
                 if let Some(var_reg) = self.get_variable(name) {
+                    // Allocate register to store the variable
                     let reg = self.registers.allocate();
                     self.push_reg(reg);
+
+                    // Load the contents of the location of the variable to the newly
+                    // allocated register
                     self.push(format!("load %r{reg}, %r{var_reg}"));
+
+                    for child in &node.children {
+                        self.generate_code(child);
+                        let expr_reg = self.pop_reg();
+                        let reg = self.registers.allocate();
+
+                        self.push(format!("aload %r{reg}, %r{index_reg}"));
+                        self.registers.free_register(index_reg);
+                    }
                 } else {
                     panic!("Variable {} not found", name);
                 }
@@ -223,13 +244,34 @@ impl IrGenerator {
                 self.push_reg(reg);
                 // Get the count of elements
                 let count = node.children.len();
-                self.push(format!("a{prefix}const %r{reg}, {count}"));
+
                 for child in &node.children {
                     self.generate_code(child);
-                    let source_reg = self.pop_reg();
-                    self.registers.free_register(source_reg);
-                    self.push(format!("{prefix}mova %r{reg}, %r{source_reg}"));
+                    //let source_reg = self.pop_reg();
+                    //self.registers.free_register(source_reg);
+                    //self.push(format!("{prefix}mova %r{reg}, %r{source_reg}"));
                 }
+                let asize: String = count
+                    .to_le_bytes()
+                    .into_iter()
+                    .map(|num| (num + b'0') as char)
+                    .collect();
+
+                let size_reg = self.registers.allocate();
+                self.push(format!("iconst %r{size_reg}, {count};"));
+                self.push(format!("newarray %r{reg}, {vm_data_type}, %r{size_reg};"));
+                self.registers.free_register(size_reg);
+
+                (0..count)
+                    .map(|_| self.pop_reg())
+                    .collect::<Vec<usize>>()
+                    .iter()
+                    .rev()
+                    .enumerate()
+                    .for_each(|(index, src_reg)| {
+                        self.push(format!("astore %r{reg}, {index}, %r{src_reg};"));
+                        self.registers.free_register(*src_reg);
+                    });
             }
 
             ValueType::Root => {

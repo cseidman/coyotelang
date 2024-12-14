@@ -174,7 +174,7 @@ impl<'a> Parser<'a> {
                     }
                 }
                 _ => {
-                    //println!("Parsing character: {}", c);
+                    continue;
                 }
             }
         }
@@ -227,13 +227,13 @@ impl<'a> Parser<'a> {
             "iconst" => Some(ICONST),
             "fconst" => Some(FCONST),
             "sconst" => Some(SCONST),
-            "aiconst" => Some(AICONST),
-            "afconst" => Some(AFCONST),
-            "asconst" => Some(ASCONST),
+            "newarray" => Some(NEWARRAY),
             "imova" => Some(IMOVA),
             "fmova" => Some(FMOVA),
             "smova" => Some(SMOVA),
             "iaprint" => Some(IAPRINT),
+            "astore" => Some(ASTORE),
+            "aload" => Some(ALOAD),
             _ => None,
         }
     }
@@ -243,16 +243,6 @@ pub fn assemble(asm: &str) -> Vec<u8> {
     let mut parser = Parser::new(asm);
     parser.assemble()
 }
-
-/*
-Language grammar:
-    <instruction> <operand1>, <operand2> ;
-    <operand> ::= <register> | <immediate> | <memory>
-    <register> ::= %r[0-9]+
-    <immediate> ::= [0-9]+
-    <memory> ::= %m[0-9]+
-    <instruction> ::= mov | add | sub | mul | div | equ | cmp | inc | dec
- */
 
 #[cfg(test)]
 mod test {

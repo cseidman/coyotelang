@@ -20,11 +20,12 @@ pub enum ValueType {
     Identifier(String),
     Statement(Command),
     AssignmentOperator,
+    ElementIndex,
     Array,
 }
 
 impl ValueType {
-    pub(crate) fn Text(text: Box<String>) -> ValueType {
+    pub(crate) fn text(text: Box<String>) -> ValueType {
         todo!()
     }
 }
@@ -70,6 +71,9 @@ impl Display for ValueType {
             }
             ValueType::Root => {
                 write!(f, "Root")
+            }
+            ValueType::ElementIndex => {
+                write!(f, "Index")
             }
         }
     }

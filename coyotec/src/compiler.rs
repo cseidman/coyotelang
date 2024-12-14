@@ -8,6 +8,7 @@ use cyasm::assembler::assemble;
 /// The compiler module is the entry point for the compiler. It takes a string of code
 /// and returns a vector of bytes that represent the compiled code.
 pub fn compile(code: &str, source_type: SourceType) -> Result<Vec<u8>> {
+    println!("{code}");
     // Empty vector to hold the compiled bytecode
     let mut bytecode = Vec::new();
     let tokens = lex(code, source_type)?;

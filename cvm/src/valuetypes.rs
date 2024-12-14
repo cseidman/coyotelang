@@ -1,14 +1,15 @@
 #![allow(dead_code)]
 
-use std::collections::HashMap;
-
-const INTEGER: u8 = 0;
+const NONE: u8 = 0;
 const FLOAT: u8 = 1;
 const BOOLEAN: u8 = 2;
 const POINTER: u8 = 3;
 const INDEX: u8 = 4;
 const BYTES: u8 = 5;
-const UINT: u8 = 6;
+const INTEGER: u8 = 6;
+const BYTE: u8 = 7;
+
+const UINT: u8 = 8;
 
 #[derive(Copy, Clone)]
 pub(crate) union Value {
@@ -19,6 +20,7 @@ pub(crate) union Value {
     pub index: u32,
     pub bytes: [u8; 8],
     pub uint: usize,
+    pub byte: u8,
 }
 impl Value {
     pub fn as_integer(&self) -> i64 {
@@ -47,19 +49,21 @@ impl Value {
     pub fn as_uint(&self) -> usize {
         unsafe { self.uint }
     }
-}
 
+    pub fn as_byte(&self) -> u8 {
+        unsafe { self.byte }
+    }
+}
+#[repr(C)]
 pub struct Array {
     pub data_type: u8,
-    pub size: usize,
-    pub data: Vec<u8>,
+    pub data: Vec<Value>,
 }
 
 impl Array {
     pub fn new(data_type: u8, size: usize) -> Self {
         Self {
             data_type,
-            size,
             data: Vec::with_capacity(size),
         }
     }

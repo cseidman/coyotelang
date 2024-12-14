@@ -258,7 +258,7 @@ impl Parser {
     }
 
     /// Array
-    fn array(&mut self) -> Result<Option<Node>> {
+    fn new_array(&mut self) -> Result<Option<Node>> {
         let current = self.current;
         let mut a_node = Node::new(
             ValueType::Array,
@@ -304,9 +304,9 @@ impl Parser {
         if self.match_token(TokenType::LParen) {
             return self.grouping();
         }
-
+        // Creates an array
         if self.match_token(TokenType::LBracket) {
-            return self.array();
+            return self.new_array();
         }
 
         let node = match token.token_type {
@@ -316,7 +316,7 @@ impl Parser {
                     ValueType::Integer(value),
                     token.location,
                     DataType::Integer,
-                    NodeType::Leaf,
+                    NodeType::Expr,
                 ))
             }
             TokenType::Float(value) => {
@@ -344,12 +344,29 @@ impl Parser {
                 } else {
                     DataType::None
                 };
-                Some(Node::new(
-                    Identifier(*name),
-                    token.location,
-                    data_type,
-                    NodeType::Expr,
-                ))
+
+                let mut var =
+                    Node::new(Identifier(*name), token.location, data_type, NodeType::Expr);
+
+                if let Some(tok) = self.peek() {
+                    match tok.token_type {
+                        TokenType::LBracket => {
+                            self.advance();
+                            let expr = self.parse_expr()?.unwrap();
+                            self.expect_token(TokenType::RBracket)?;
+                            let mut index = Node::new(
+                                ValueType::ElementIndex,
+                                token.location,
+                                data_type,
+                                NodeType::Expr,
+                            );
+                            index.add_child(expr);
+                            var.add_child(index);
+                        }
+                        _ => {}
+                    }
+                }
+                Some(var)
             }
             TokenType::EOF => None,
             _ => bail!("Unexpected token {:?}", token.token_type),

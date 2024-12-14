@@ -1,8 +1,9 @@
 #![allow(dead_code)]
 
 use crate::heap::Heap;
+use crate::valuetypes::Array;
 use crate::{constants::*, valuetypes::Value};
-use std::collections::HashMap;
+use std::usize;
 
 type Register = Value;
 
@@ -53,6 +54,18 @@ impl Vm {
         let bytes: [u8; 8] = self.code[self.ip..self.ip + 8].try_into().unwrap();
         self.ip += 8;
         Value { bytes }
+    }
+
+    fn get_integer(&mut self) -> usize {
+        let bytes: [u8; 8] = self.code[self.ip..self.ip + 8].try_into().unwrap();
+        self.ip += 8;
+        usize::from_le_bytes(bytes)
+    }
+
+    fn get_byte(&mut self) -> u8 {
+        let byte = self.code[self.ip];
+        self.ip += 8;
+        byte
     }
 
     fn load_constants(&mut self) {
@@ -122,27 +135,6 @@ impl Vm {
                 SCONST => {
                     self.sconst();
                 }
-                AICONST => {
-                    let reg = self.get_register_location();
-                    let array_size = self.get_data().as_uint();
-                    let mut array: HashMap<usize, Value> = HashMap::with_capacity(array_size);
-                    for i in 0..array_size {
-                        let value = self.get_data();
-                        array.insert(i, value);
-                    }
-                    let ptr = self.heap.store(array);
-                    self.registers[reg].ptr = ptr;
-                }
-                AFCONST => {
-                    let reg = self.get_register_location();
-                    let value = self.get_data().as_index();
-                    self.registers[reg].index = value;
-                }
-                ASCONST => {
-                    let reg = self.get_register_location();
-                    let value = self.get_data().as_index();
-                    self.registers[reg].index = value;
-                }
 
                 IADD => {
                     ibinop!(+);
@@ -176,6 +168,43 @@ impl Vm {
                     let reg = self.get_register_location();
                     self.registers[reg].f = -self.registers[reg].as_float();
                 }
+                NEWARRAY => {
+                    // Get the location where the pointer to the array will live
+                    let reg = self.get_register_location();
+                    let data_type = self.get_integer() as u8;
+                    let sreg = self.get_register_location();
+
+                    let size = self.registers[sreg].as_integer() as usize;
+
+                    let array = Array::new(data_type, size);
+                    let ptr = self.heap.store(array);
+                    self.registers[reg].ptr = ptr;
+                    println!("R{reg}, {data_type}, R{sreg}");
+                }
+                ASTORE => {
+                    let reg = self.get_register_location();
+                    let ptr = self.registers[reg].as_ptr();
+                    let array: &mut Array = unsafe { &mut *(ptr as *mut Array) };
+
+                    let index = self.get_data().as_uint();
+                    let sreg = self.get_register_location();
+
+                    array.data.push(self.registers[sreg]);
+                    println!("R{reg}, {index}, R{sreg}");
+                }
+
+                ALOAD => {
+                    // Location of the array
+                    let reg = self.get_register_location();
+                    println!("\nREG: {reg}");
+                    let ptr = self.registers[reg].as_ptr();
+                    let array: &mut Array = unsafe { &mut *(ptr as *mut Array) };
+                    //println!("ARRAY: {}", array.data[1].as_integer());
+                    let index = self.get_data().as_uint();
+                    self.registers[reg] = array.data[index];
+                    println!("R{reg}, {index}");
+                }
+
                 IPRINT => {
                     self.iprint();
                 }
@@ -225,7 +254,22 @@ impl Vm {
         println!("\t{value}");
     }
 
-    fn iaprint(&mut self) {}
+    fn iaprint(&mut self) {
+        let reg = self.get_register_location();
+        let ptr = self.registers[reg].as_ptr();
+
+        let array = unsafe { &*(ptr as *const Array) };
+
+        println!("R{reg}");
+        print!("[");
+        let mut comma = "";
+        array.data.iter().for_each(|v| {
+            print!("{} {}", comma, v.as_integer());
+            comma = ",";
+        });
+
+        println!("]");
+    }
 
     fn sconst(&mut self) {
         // Get the target register

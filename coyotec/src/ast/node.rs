@@ -1,4 +1,4 @@
-use crate::ast::tree::{NodeType, ValueType};
+use crate::ast::tree::{BinOp, NodeType, UnaryOp, ValueType};
 use crate::datatypes::datatype::DataType;
 use crate::tokens::Location;
 use std::fmt::{Display, Formatter};
@@ -42,4 +42,30 @@ impl Node {
             child.display_tree();
         }
     }
+}
+
+pub enum Term {
+    Expr(ExprNode),
+    Const(ConstNode),
+}
+
+struct ExprNode {
+    pub expr: Box<Term>,
+    pub location: Location,
+}
+struct BinopNode {
+    pub left: Box<ExprNode>,
+    pub right: Box<ExprNode>,
+    pub binop: BinOp,
+    pub location: Location,
+}
+struct UnopNode {
+    pub value: Box<ExprNode>,
+    pub unop: UnaryOp,
+    pub location: Location,
+}
+struct ConstNode {
+    pub value: Box<Node>,
+    pub data_type: DataType,
+    pub location: Location,
 }
