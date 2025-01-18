@@ -2,8 +2,13 @@
 #![allow(dead_code, unused_variables)]
 
 use crate::allocator::Registers;
-use crate::ast::tree::{BinOp, Command, Node, UnaryOp, ValueType};
+use crate::ast::node::{BinOp, NodeType, UnOp};
+use crate::ast::tree::{Command, Node, ValueType};
+use crate::datatypes::datatype::DataType;
+use crate::tokens::{BaseType, TokenType};
+use anyhow::anyhow;
 use std::collections::HashMap;
+use std::error::Error;
 use std::fmt::{Display, Formatter};
 
 /// These are the instructions that the IR will have
@@ -12,8 +17,6 @@ use std::fmt::{Display, Formatter};
 pub struct IrGenerator {
     registers: Registers,
     instructions: Vec<String>,
-    tmp_regs: Vec<usize>,
-
     string_pool: Vec<String>,
     strings_index: usize,
     scope: usize,
@@ -48,7 +51,6 @@ impl IrGenerator {
         Self {
             registers: Registers::new(1024000),
             instructions: Vec::new(),
-            tmp_regs: Vec::new(),
             string_pool: Vec::new(),
             strings_index: 0,
             scope: 0,
@@ -89,156 +91,120 @@ impl IrGenerator {
         self.instructions.push(instruction);
     }
 
-    fn pop_reg(&mut self) -> usize {
-        if let Some(reg) = self.tmp_regs.pop() {
-            return reg;
-        }
-        self.registers.allocate()
-    }
-
-    fn peek_reg(&mut self) -> usize {
-        if let Some(reg) = self.tmp_regs.clone().pop() {
-            return reg;
-        }
-        self.registers.allocate()
-    }
-
-    fn push_reg(&mut self, reg: usize) {
-        self.tmp_regs.push(reg);
-    }
-
     pub fn generate(&mut self, node: &Node) {
         self.clear();
         self.generate_code(node);
     }
 
     fn generate_code(&mut self, node: &Node) {
-        let data_type = node.data_type;
-        let prefix = data_type.get_prefix();
+        let data_type = &node.return_type;
 
-        match &node.value_type {
-            ValueType::Integer(value) => {
-                let reg = self.registers.allocate();
-                self.push_reg(reg);
-                self.push(format!("iconst %r{}, {};", reg, value));
+        match node.clone().node_type {
+            NodeType::Integer(value) => {
+                self.push(format!("push {} ;", value));
             }
-            ValueType::Float(value) => {
-                let reg = self.registers.allocate();
-                self.push_reg(reg);
-                self.push(format!("fconst %r{}, {};", reg, value));
+            NodeType::Float(value) => {
+                self.push(format!("push {} ;", value));
             }
-            ValueType::Text(value) => {
-                let reg = self.registers.allocate();
-                self.push_reg(reg);
+            NodeType::Text(value) => {
                 let loc = self.get_string_location(&*value);
-                self.push(format!("sconst %r{}, {};", reg, loc));
+                self.push(format!("push {} ;", loc));
             }
-            ValueType::BinOperator(op) => {
+            NodeType::Boolean(value) => {
+                self.push(format!("push {} ;", value));
+            }
+
+            NodeType::BinaryOp(op) => {
                 for child in &node.children {
                     self.generate_code(child);
                 }
-                // The binary operator will have a register for each child
-                // and the result will be stored in the first register
-                // So we need to find two free registers to use
-                // And the second register can be freed after the operation
-                let rhr = self.pop_reg();
-                let lhr = self.pop_reg();
-
                 match op {
                     BinOp::Add => {
-                        self.push(format!("{prefix}add %r{lhr}, %r{rhr} ;"));
+                        self.push(format!("add ;"));
                     }
                     BinOp::Sub => {
-                        self.push(format!("{prefix}sub %r{lhr}, %r{rhr} ;"));
+                        self.push(format!("sub ;"));
                     }
                     BinOp::Mul => {
-                        self.push(format!("{prefix}mul %r{lhr}, %r{rhr} ;"));
+                        self.push(format!("mul ;"));
                     }
                     BinOp::Div => {
-                        self.push(format!("{prefix}div %r{lhr}, %r{rhr} ;"));
+                        self.push(format!("div ;"));
                     }
-                }
+                    BinOp::Pow => {
+                        self.push(format!("pow ;"));
+                    }
 
-                self.push_reg(lhr);
-                self.registers.free_register(rhr);
+                    BinOp::And => {}
+                    BinOp::Or => {}
+                }
             }
-            ValueType::UnaryOperator(op) => {
+            NodeType::UnaryOp(op) => {
                 for child in &node.children {
                     self.generate_code(child);
                 }
-                // The unary operator will have a register for the child
-                // and the result will be stored in the same register
-                let reg = self.peek_reg();
                 match op {
-                    UnaryOp::Neg | UnaryOp::Not => {
-                        self.push(format!("{prefix}neg %r{reg};"));
+                    UnOp::Neg | UnOp::Not => {
+                        self.push(format!("neg ;"));
                     }
                 }
             }
-            ValueType::Statement(command) if *command == Command::Let => {
+            NodeType::Let => {
                 let node = node.children[0].clone();
+                let token_type = node.token.unwrap().token_type;
 
-                // If it's NOT an identifier, panic
-                let identifier_name = match &node.value_type {
-                    ValueType::Identifier(name) => name,
-                    _ => panic!("Expected identifier: found {:?}", node),
+                // There needs to be a variable name at this point
+                let var_name = if let TokenType::Identifier(name) = token_type {
+                    name
+                } else {
+                    panic!(
+                        "There needs to be a variable name after `let`, found {:?}",
+                        token_type
+                    );
                 };
 
-                let data_type = node.data_type;
-                let prefix = data_type.get_prefix();
+                let data_type = node.return_type;
 
-                // Check of the next child in an assignment operator
-                let next_node = &node.children[0];
-                if next_node.value_type == ValueType::AssignmentOperator {
-                    self.generate_code(&node.children[1]);
+                // Check the next child in an assignment operator
+                if let Some(next_node) = node.children.get(0) {
+                    // Generate the expression that gets assigned to the variable
+                    self.generate_code(next_node);
 
-                    // Assign a register to the identifier and store it
-                    let sreg = self.store_variable(identifier_name);
-                    let reg = self.pop_reg();
-
-                    self.push(format!("store %r{sreg}, %r{reg};",));
+                    self.push(format!("store ;",));
                 }
             }
-            ValueType::Statement(command) if *command == Command::Print => {
+            NodeType::Print => {
                 for c in &node.children {
                     self.generate_code(c);
                 }
-                let reg = self.pop_reg();
-                self.push(format!("{prefix}print %r{reg};"));
+                self.push(format!("print ;"));
             }
-            ValueType::Identifier(name) => {
-                if let Some(var_reg) = self.get_variable(name) {
-                    let reg = self.registers.allocate();
-                    self.push_reg(reg);
-                    self.push(format!("load %r{reg}, %r{var_reg}"));
+            NodeType::Ident(name, node_type) => {
+                if let Some(var_reg) = self.get_variable(&name) {
+                    // Allocate register to store the variable
+
+                    // Load the contents of the location of the variable to the newly
+                    // allocated register
+                    self.push(format!("load {var_reg}"));
+
+                    for child in &node.children {}
                 } else {
                     panic!("Variable {} not found", name);
                 }
             }
+            // We don't need to capture the internal elements here because we're drilling
+            // down into the elements
+            NodeType::Array(_) => {}
 
-            ValueType::Array => {
-                // This is the register where the array is stored
-                let reg = self.registers.allocate();
-                // Save the array register for later
-                self.push_reg(reg);
-                // Get the count of elements
-                let count = node.children.len();
-                self.push(format!("a{prefix}const %r{reg}, {count}"));
-                for child in &node.children {
-                    self.generate_code(child);
-                    let source_reg = self.pop_reg();
-                    self.registers.free_register(source_reg);
-                    self.push(format!("{prefix}mova %r{reg}, %r{source_reg}"));
-                }
-            }
-
-            ValueType::Root => {
+            NodeType::Root => {
                 for child in &node.children {
                     self.generate_code(child);
                 }
             }
 
-            _ => {}
+            _ => {
+                println!(".end")
+            }
         }
     }
 }

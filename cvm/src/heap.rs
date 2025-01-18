@@ -1,6 +1,6 @@
-#![allow(unused_macros, dead_code)]
+#![allow(unused_macros, dead_code, unused_imports)]
 use crate::valuetypes::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fmt::Display;
 
 #[derive(Clone)]
@@ -38,6 +38,7 @@ impl Heap {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::valuetypes::Array;
 
     #[test]
     fn test_heap() {
@@ -51,29 +52,17 @@ mod tests {
 
     #[test]
     fn test_heap_array() {
-        #[repr(C)]
-        struct Array {
-            atype: u8,
-            data: HashMap<u8, u8>,
-        }
-
         let a = Array {
-            atype: 8,
-            data: HashMap::from([(1, 10), (2, 20)]),
+            data_type: 6,
+            data: vec![Value { i: 10 }, Value { i: 20 }],
         };
 
-        let aptr = &a as *const Array as *const u8;
-        let num_bytes = std::mem::size_of::<u8>(); // Number of bytes to read (for `atype` field in this case)
-        let bytes = unsafe { std::slice::from_raw_parts(aptr, 1) };
-
-        println!("Bytes: {:?}", bytes);
-
-        let b: HashMap<u8, u8> = HashMap::from([(1, 10), (2, 20)]);
-
         let mut heap = Heap::new();
-        let ptr = heap.store(a);
-        let num = unsafe { &*(ptr as *const Array) };
-        assert_eq!(b[&2], 20);
-        heap.free_entry(ptr);
+        let new_ptr = heap.store(a);
+        let bytes = unsafe { std::slice::from_raw_parts(new_ptr, 1) };
+        assert_eq!(bytes, &[6]);
+        let num = unsafe { &*(new_ptr as *const Array) };
+        assert_eq!(num.data[0].as_integer(), 10);
+        heap.free_entry(new_ptr);
     }
 }

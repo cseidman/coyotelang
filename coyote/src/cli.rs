@@ -6,7 +6,8 @@ use rustyline::DefaultEditor;
 
 use clap::Parser;
 use colored::Colorize;
-use coyotec::ast::tree::{NodeType, ValueType};
+use coyotec::ast::node::{display_tree, NodeType};
+use coyotec::ast::tree::ValueType;
 use coyotec::ast::Node;
 use coyotec::compiler::compile;
 use coyotec::datatypes::datatype::DataType;
@@ -90,12 +91,7 @@ fn repl<'a>() -> Result<()> {
     }
 
     let mut vm = Vm::new();
-    let ast: Node = Node::new(
-        ValueType::Root,
-        Default::default(),
-        DataType::None,
-        NodeType::Leaf,
-    );
+    let ast: Node = Node::new(NodeType::Root, Default::default());
     let mut generator = IrGenerator::new(&ast);
     let mut parser = parser::Parser::new(vec![], "".to_string());
     let mut tokens: Vec<Token> = Vec::new();
@@ -112,6 +108,8 @@ fn repl<'a>() -> Result<()> {
                 parser.add_tokens(tokens, line);
 
                 if let Ok(node) = parser.parse() {
+                    display_tree(&node);
+
                     // Generate the assembly code
                     generator.generate(&node);
                     let asm = format!("{}", generator);
@@ -120,6 +118,7 @@ fn repl<'a>() -> Result<()> {
                     // Assemble the assembly code into bytecode
                     let bytecode = assemble(&asm);
                     vm.code = bytecode;
+                    println!("{:?}", &vm.code);
                     vm.run()
                 } else {
                     bail!("Error parsing");

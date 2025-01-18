@@ -1,14 +1,16 @@
 #![allow(dead_code)]
 
 use crate::heap::Heap;
-use crate::{constants::*, valuetypes::Value};
-use std::collections::HashMap;
-
-type Register = Value;
+use crate::{
+    constants::Instruction,
+    constants::Instruction::*,
+    valuetypes::{DataTag, Object, Value},
+};
+use std::{result, usize};
 
 pub struct Vm {
-    // Registers
-    registers: [Register; 64000],
+    stack: [Object; 64000],
+    sp: usize,
     heap: Heap,
     pub code: Vec<u8>,
     string_pool: Vec<String>,
@@ -17,8 +19,14 @@ pub struct Vm {
 
 impl Vm {
     pub fn new() -> Self {
+        let obj = Object {
+            tag: DataTag::Nil,
+            data: Value { byte: 0 },
+        };
+
         Self {
-            registers: [Value { i: 0 }; 64000],
+            stack: [obj; 64000],
+            sp: 0,
             code: Vec::new(),
             heap: Heap::new(),
             string_pool: Vec::new(),
@@ -26,27 +34,10 @@ impl Vm {
         }
     }
 
-    fn get_instruction(&mut self) -> u8 {
+    fn get_instruction(&mut self) -> Instruction {
+        let byte = self.code[self.ip];
         self.ip += 1;
-        self.code[self.ip - 1]
-    }
-
-    fn read_register_value(&mut self) -> Register {
-        let loc = u16::from_le_bytes(self.code[self.ip..self.ip + 1].try_into().unwrap());
-        self.ip += 2;
-        self.registers[loc as usize]
-    }
-
-    fn load_register(&mut self, reg: Register) {
-        let loc = u16::from_le_bytes(self.code[self.ip..=self.ip + 2].try_into().unwrap());
-        self.ip += 2;
-        self.registers[loc as usize] = reg;
-    }
-
-    fn get_register_location(&mut self) -> usize {
-        let loc = u16::from_le_bytes(self.code[self.ip..self.ip + 2].try_into().unwrap()) as usize;
-        self.ip += 2;
-        loc
+        Instruction::from_u8(byte)
     }
 
     fn get_data(&mut self) -> Value {
@@ -55,7 +46,44 @@ impl Vm {
         Value { bytes }
     }
 
-    fn load_constants(&mut self) {
+    fn get_integer(&mut self) -> usize {
+        let bytes: [u8; 8] = self.code[self.ip..self.ip + 8].try_into().unwrap();
+        self.ip += 8;
+        usize::from_le_bytes(bytes)
+    }
+
+    fn get_byte(&mut self) -> u8 {
+        let byte = self.code[self.ip];
+        self.ip += 8;
+        byte
+    }
+
+    fn pop(&mut self) -> Object {
+        self.sp -= 1;
+        self.stack[self.sp]
+    }
+
+    fn push(&mut self, obj: Object) {
+        self.stack[self.sp] = obj;
+        self.sp += 1;
+    }
+
+    fn load(&mut self) {}
+
+    fn store(&mut self) {}
+    /// Gets the value that exists following the `const` instruction
+    fn get_const(&mut self) -> Object {
+        // The const has already been consumed so the next byte tells us the type
+        let tag = DataTag::from(self.code[self.ip]);
+        self.ip += 1;
+        Object {
+            tag,
+            data: self.get_data(),
+        }
+    }
+
+    /// Loads constants from the ASM file that need to go into the string pool
+    fn load_string_pool(&mut self) {
         self.string_pool.clear();
         let num_constants = u32::from_le_bytes(self.code[0..4].try_into().unwrap());
         self.ip += 4;
@@ -72,138 +100,83 @@ impl Vm {
     pub fn run(&mut self) {
         println!("Loading constants");
         self.ip = 0;
-        self.load_constants();
+        self.load_string_pool();
         println!("Executing code ..");
 
-        macro_rules! ibinop {
+        macro_rules! binop {
             ($op:tt) => {
-                let reg1 = self.get_register_location();
-                let reg2 = self.get_register_location();
 
-                let rval = self.registers[reg1].as_integer();
-                let lval = self.registers[reg2].as_integer();
-                self.registers[reg1].i = lval $op rval;
-                println!("R{reg1}, R{reg2}; R{reg1}={lval}  R{reg2}={rval}");
+                let left = self.pop();
+                let right = self.pop();
+
+                let left_tag = left.tag;
+                let right_tag = right.tag;
+
+                let result_value = left.data.as_float() $op right.data.as_float();
+
+                let result_tag = match (left_tag, right_tag) {
+                    (DataTag::Integer, DataTag::Integer) => DataTag::Integer,
+                    (DataTag::Float, _) | (_, DataTag::Float) => DataTag::Float,
+                    _ => panic!("Tag combination {:?} and {:?} are not allowed", left_tag, right_tag),
+                };
+
+                let result = Object {
+                    tag: result_tag,
+                    data: Value { f: result_value },
+                };
+
+                self.push(result);
             };
         }
 
-        macro_rules! fbinop {
-            ($op:tt) => {
-                let reg1 = self.get_register_location();
-                let reg2 = self.get_register_location();
-
-                let rval = self.registers[reg1].as_float();
-                let lval = self.registers[reg2].as_float();
-                self.registers[reg1].f = lval $op rval;
-            };
-        }
         println!("\nVM Debug");
         println!("--------");
         loop {
             let b = self.get_instruction();
-            print!("{} ", INSTRUCTIONS[b as usize]);
+            println!("{} ", b.as_str());
             match b {
-                STORE => {
-                    self.store();
-                }
-
-                LOAD => {
+                Load => {
                     self.load();
                 }
 
-                ICONST => {
-                    self.iconst();
+                Push => {
+                    let obj = self.get_const();
+                    self.push(obj);
                 }
 
-                FCONST => {
-                    self.fconst();
+                Add => {
+                    binop!(+);
                 }
 
-                SCONST => {
-                    self.sconst();
-                }
-                AICONST => {
-                    let reg = self.get_register_location();
-                    let array_size = self.get_data().as_uint();
-                    let mut array: HashMap<usize, Value> = HashMap::with_capacity(array_size);
-                    for i in 0..array_size {
-                        let value = self.get_data();
-                        array.insert(i, value);
-                    }
-                    let ptr = self.heap.store(array);
-                    self.registers[reg].ptr = ptr;
-                }
-                AFCONST => {
-                    let reg = self.get_register_location();
-                    let value = self.get_data().as_index();
-                    self.registers[reg].index = value;
-                }
-                ASCONST => {
-                    let reg = self.get_register_location();
-                    let value = self.get_data().as_index();
-                    self.registers[reg].index = value;
+                Sub => {
+                    binop!(-);
                 }
 
-                IADD => {
-                    ibinop!(+);
-                }
-                FADD => {
-                    fbinop!(+);
-                }
-                ISUB => {
-                    ibinop!(-);
-                }
-                FSUB => {
-                    fbinop!(-);
-                }
-                IMUL => {
-                    ibinop!(*);
-                }
-                FMUL => {
-                    fbinop!(*);
-                }
-                IDIV => {
-                    ibinop!(/);
-                }
-                FDIV => {
-                    fbinop!(/);
-                }
-                INEG => {
-                    let reg = self.get_register_location();
-                    self.registers[reg].i = -self.registers[reg].as_integer();
-                }
-                FNEG => {
-                    let reg = self.get_register_location();
-                    self.registers[reg].f = -self.registers[reg].as_float();
-                }
-                IPRINT => {
-                    self.iprint();
-                }
-                IAPRINT => {
-                    self.iaprint();
-                }
-                FPRINT => {
-                    let reg = self.get_register_location();
-                    let value = self.registers[reg].as_float();
-
-                    println!("R{reg}");
-                    println!("\t{value}");
-                }
-                SPRINT => {
-                    let reg = self.get_register_location();
-                    let index = self.registers[reg].as_index() as usize;
-                    let value = self.string_pool[index].clone();
-
-                    println!("R{reg}");
-                    println!("\t{value}");
+                Mul => {
+                    binop!(*);
                 }
 
-                HALT => {
-                    println!();
+                Div => {
+                    binop!(/);
+                }
+
+                Neg => {}
+
+                Newarray => {}
+                Store => {}
+
+                Pop => {}
+
+                Print => {
+                    self.print();
+                }
+
+                Halt => unsafe {
+                    println!("\n{}", self.pop());
                     break;
-                }
+                },
                 _ => {
-                    println!("Unknown instruction: {}", b);
+                    println!("Unknown instruction: {}", b.as_str());
                     break;
                 }
             }
@@ -217,50 +190,8 @@ impl Vm {
         //println!("{}", self.registers[0].as_integer());
     }
 
-    fn iprint(&mut self) {
-        let reg = self.get_register_location();
-        let value = self.registers[reg].as_integer();
-
-        println!("R{reg}");
-        println!("\t{value}");
-    }
-
-    fn iaprint(&mut self) {}
-
-    fn sconst(&mut self) {
-        // Get the target register
-        let reg = self.get_register_location();
-        // Get the index of the string in the string pool
-        let index = self.get_data().as_index();
-        // Get the string from the string pool
-
-        self.registers[reg].index = index;
-    }
-
-    fn fconst(&mut self) {
-        let reg = self.get_register_location();
-        let value = self.get_data().as_float();
-        self.registers[reg].f = value;
-    }
-
-    fn load(&mut self) {
-        let reg = self.get_register_location();
-        let value = self.get_register_location();
-        self.registers[reg] = self.registers[value];
-        println!("R{}, R{};", reg, value);
-    }
-
-    fn store(&mut self) {
-        let reg = self.get_register_location();
-        let value = self.get_register_location();
-        self.registers[reg] = self.registers[value];
-        println!("R{}, {};", reg, value);
-    }
-    fn iconst(&mut self) {
-        let reg = self.get_register_location();
-        let value = self.get_data().as_integer();
-        self.registers[reg].i = value;
-        println!("R{}, {};", reg, value);
+    fn print(&mut self) {
+        let value = self.stack[self.sp];
     }
 }
 
@@ -275,27 +206,8 @@ mod test {
     use super::*;
     use crate::vm::Vm;
     #[test]
-    fn test_vm() {
-        let mut vm = Vm::new();
-        vm.code = vec![
-            IMOV, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, IMOV, 1, 0, 3, 0, 0, 0, 0, 0, 0, 0, IMOV, 2, 0, 2,
-            0, 0, 0, 0, 0, 0, 0, IMUL, 1, 0, 2, 0, IMOV, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, IADD, 1, 0,
-            2, 0, IADD, 0, 0, 1, 0, HALT,
-        ];
-        vm.run();
-
-        assert_eq!(vm.registers[0].as_integer(), 11);
-    }
+    fn test_vm() {}
 
     #[test]
-    fn test_vm_let() {
-        let mut vm = Vm::new();
-        vm.code = vec![
-            STORE, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, STORE, 1, 0, 3, 0, 0, 0, 0, 0, 0, 0, IADD, 0, 0,
-            1, 0, HALT,
-        ];
-        vm.run();
-
-        assert_eq!(vm.registers[0].as_integer(), 7);
-    }
+    fn test_vm_let() {}
 }
