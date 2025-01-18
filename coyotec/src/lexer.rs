@@ -1,5 +1,5 @@
 #![allow(dead_code, unused_variables, unused_imports)]
-use crate::tokens::{Location, Token, TokenType};
+use crate::tokens::{BaseType, Location, Token, TokenType};
 use anyhow::{anyhow, Context, Result};
 use std::iter::Peekable;
 use std::str::Chars;
@@ -151,7 +151,7 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
                 tokens.push(lexer.make_token(TokenType::Float(num)));
                 continue;
             } else {
-                let num: i64 = snum.parse().unwrap();
+                let num: f64 = snum.parse().unwrap();
                 tokens.push(lexer.make_token(TokenType::Integer(num)));
                 continue;
             }
@@ -169,10 +169,14 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
                 }
             }
             let tok = match ident.as_str() {
+                // Statements
                 "let" => lexer.make_token(TokenType::Let),
                 "func" => lexer.make_token(TokenType::Func),
                 "print" => lexer.make_token(TokenType::Print),
-                _ => lexer.make_token(TokenType::Identifier(Box::new(ident))),
+                // Datatypes
+                "int" => lexer.make_token(TokenType::DataType(BaseType::Integer)),
+                // And if all else fails: identifier
+                _ => lexer.make_token(TokenType::Identifier(ident)),
             };
             tokens.push(tok);
             //lexer.advance();
@@ -245,7 +249,7 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
                     lexer.advance();
                 }
                 lexer.advance();
-                TokenType::Text(Box::new(s))
+                TokenType::Text(s)
             }
             _ => {
                 let err_msg = format!("Unexpected character: {c}");

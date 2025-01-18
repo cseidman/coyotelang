@@ -1,4 +1,5 @@
 pub mod constants;
+mod ctable;
 mod heap;
-mod valuetypes;
+pub mod valuetypes;
 pub mod vm;

@@ -15,27 +15,18 @@ pub enum ValueType {
     Integer(i64),
     Float(f64),
     Text(Box<String>),
-    BinOperator(BinOp),
-    UnaryOperator(UnaryOp),
     Identifier(String),
     Statement(Command),
     AssignmentOperator,
     ElementIndex,
     Array,
+    List,
 }
 
 impl ValueType {
     pub(crate) fn text(text: Box<String>) -> ValueType {
         todo!()
     }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum NodeType {
-    Leaf,
-    Op,
-    Expr,
-    Statement,
 }
 
 impl Display for ValueType {
@@ -50,12 +41,7 @@ impl Display for ValueType {
             ValueType::Text(value) => {
                 write!(f, "{value}")
             }
-            ValueType::BinOperator(value) => {
-                write!(f, "{value}")
-            }
-            ValueType::UnaryOperator(value) => {
-                write!(f, "{value}")
-            }
+
             ValueType::Identifier(value) => {
                 write!(f, "{value}")
             }
@@ -75,39 +61,9 @@ impl Display for ValueType {
             ValueType::ElementIndex => {
                 write!(f, "Index")
             }
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum BinOp {
-    Add,
-    Sub,
-    Mul,
-    Div,
-}
-
-impl Display for BinOp {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            BinOp::Add => write!(f, "add"),
-            BinOp::Sub => write!(f, "sub"),
-            BinOp::Mul => write!(f, "mul"),
-            BinOp::Div => write!(f, "div"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum UnaryOp {
-    Neg,
-    Not,
-}
-impl Display for UnaryOp {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            UnaryOp::Neg => write!(f, "neg"),
-            UnaryOp::Not => write!(f, "not"),
+            ValueType::List => {
+                write!(f, "List")
+            }
         }
     }
 }

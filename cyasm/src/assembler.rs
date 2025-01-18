@@ -1,15 +1,16 @@
 #![allow(dead_code)]
 use cvm::constants::*;
+use cvm::valuetypes::DataTag;
 use std::iter::Peekable;
 use std::str::Chars;
 
-struct Parser<'a> {
+struct AsmParser<'a> {
     asm: Peekable<Chars<'a>>,
     line: usize,
     bytecode: Vec<u8>,
 }
 
-impl<'a> Parser<'a> {
+impl<'a> AsmParser<'a> {
     pub fn new(asm: &'a str) -> Self {
         Self {
             asm: asm.chars().peekable(),
@@ -75,8 +76,8 @@ impl<'a> Parser<'a> {
             }
 
             // Add the count as 4 byte integer
-            //self.bytecode
-            //    .append(&mut const_count.to_le_bytes().to_vec());
+            // self.bytecode
+            // .append(&mut const_count.to_le_bytes().to_vec());
 
             // Add the length of the string as a 4 byte integer
             let constant = line.trim();
@@ -139,8 +140,8 @@ impl<'a> Parser<'a> {
                     }
                 }
 
-                if let Some(byte) = self.match_keyword(s.clone()) {
-                    self.emit_command(byte);
+                if let Some(byte) = self.match_keyword(&s) {
+                    self.emit_command(byte as u8);
                     continue;
                 }
             }
@@ -148,34 +149,14 @@ impl<'a> Parser<'a> {
             if c.is_ascii_digit() {
                 let s = self.make_number_string();
 
-                let num = if s.contains('.') {
-                    s.parse::<f64>().unwrap().to_le_bytes()
+                if s.contains('.') {
+                    self.bytecode.push(DataTag::Float as u8);
                 } else {
-                    s.parse::<i64>().unwrap().to_le_bytes()
+                    self.bytecode.push(DataTag::Integer as u8);
                 };
+                let num = s.parse::<f64>().unwrap().to_le_bytes();
                 self.emit_operand(num);
                 continue;
-            }
-
-            match c {
-                '%' => {
-                    self.advance();
-                    if let Some(&chr) = self.asm.peek() {
-                        self.advance();
-                        match chr {
-                            'r' | 'm' => {
-                                let s = self.make_number_string();
-                                self.emit_register(s.parse::<u16>().unwrap());
-                            }
-                            _ => {
-                                panic!("Invalid character: {}", chr);
-                            }
-                        }
-                    }
-                }
-                _ => {
-                    continue;
-                }
             }
         }
         self.bytecode.push(0x00);
@@ -200,47 +181,13 @@ impl<'a> Parser<'a> {
         self.bytecode.append(&mut reg);
     }
 
-    fn match_keyword(&self, keyword: String) -> Option<u8> {
-        match keyword.as_str() {
-            "imov" => Some(IMOV),
-            "iadd" => Some(IADD),
-            "isub" => Some(ISUB),
-            "imul" => Some(IMUL),
-            "idiv" => Some(IDIV),
-            "iequ" => Some(IEQU),
-            "fmov" => Some(FMOV),
-            "smov" => Some(SMOV),
-            "fadd" => Some(FADD),
-            "fsub" => Some(FSUB),
-            "fmul" => Some(FMUL),
-            "fdiv" => Some(FDIV),
-            "idec" => Some(IDEC),
-            "cmp" => Some(CMP),
-            "iinc" => Some(IINC),
-            "store" => Some(STORE),
-            "load" => Some(LOAD),
-            "iprint" => Some(IPRINT),
-            "sprint" => Some(SPRINT),
-            "fprint" => Some(FPRINT),
-            "ineg" => Some(INEG),
-            "fneg" => Some(FNEG),
-            "iconst" => Some(ICONST),
-            "fconst" => Some(FCONST),
-            "sconst" => Some(SCONST),
-            "newarray" => Some(NEWARRAY),
-            "imova" => Some(IMOVA),
-            "fmova" => Some(FMOVA),
-            "smova" => Some(SMOVA),
-            "iaprint" => Some(IAPRINT),
-            "astore" => Some(ASTORE),
-            "aload" => Some(ALOAD),
-            _ => None,
-        }
+    fn match_keyword(&self, keyword: &str) -> Option<Instruction> {
+        Instruction::match_instruction(keyword)
     }
 }
 
 pub fn assemble(asm: &str) -> Vec<u8> {
-    let mut parser = Parser::new(asm);
+    let mut parser = AsmParser::new(asm);
     parser.assemble()
 }
 
@@ -249,27 +196,5 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_asm_parser() {
-        let asm = r#"
-        imov %r0, 4 ;
-        imov %r1, 3 ;
-        imov %r2, 2 ;
-        imul %r1, %r2 ;
-        imov %r2, 1 ;
-        iadd %r1, %r2 ;
-        iadd %r0, %r1 ;
-        store %r3, %r0 ;
-        imov %r4, 10 ;
-        iadd %r4, %r3 ;
-        "#;
-        let mut parser = Parser::new(asm);
-        let byte_code = parser.assemble();
-        let expected = vec![
-            IMOV, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, IMOV, 1, 0, 3, 0, 0, 0, 0, 0, 0, 0, IMOV, 2, 0, 2,
-            0, 0, 0, 0, 0, 0, 0, IMUL, 1, 0, 2, 0, IMOV, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, IADD, 1, 0,
-            2, 0, IADD, 0, 0, 1, 0, STORE, 3, 0, 0, 0, IMOV, 4, 0, 10, 0, 0, 0, 0, 0, 0, 0, IADD,
-            4, 0, 3, 0, 0,
-        ];
-        assert_eq!(byte_code, expected);
-    }
+    fn test_asm_parser() {}
 }

@@ -1,19 +1,25 @@
 #![allow(dead_code, unused_variables, unused_imports)]
-use crate::ast::tree::ValueType::*;
-use crate::ast::tree::{BinOp, Command, Node, NodeType, UnaryOp, ValueType};
-use crate::datatypes::datatype::DataType;
 
+use crate::ast::tree::ValueType;
+use crate::ast::tree::ValueType::*;
+use crate::datatypes::datatype::DataType;
 /// The parser takes a vector of tokens from the lexer and builds the AST
 ///
 /// The parser is a recursive descent parser that builds the AST from the tokens
-use crate::tokens::{Location, Token, TokenType};
+use crate::tokens::{BaseType, Location, Token, TokenType};
+use std::cmp::PartialEq;
+use std::collections::HashMap;
 
-use anyhow::{bail, Error, Result};
+use anyhow::{anyhow, bail, Error, Result};
 use std::slice::Iter;
 
 use crate::allocator::Registers;
+use crate::ast::node::NodeType::*;
+use crate::ast::node::UnOp::Neg;
+use crate::ast::node::{BinOp, Node, NodeType, UnOp};
 use crate::symbols::{Symbol, SymbolTable};
-use crate::Deferable;
+use crate::tokens::{BaseType::*, TokenType::*};
+use crate::{tokens, Deferable};
 
 const PREVIOUS: usize = 0;
 const CURRENT: usize = 1;
@@ -36,6 +42,10 @@ impl Parser {
             symbol_table: SymbolTable::new(),
             has_error: false,
         }
+    }
+
+    fn current_token(&self) -> Option<Token> {
+        self.tokens.get(self.current).cloned()
     }
 
     fn raise_error(&mut self, msg: &str) {
@@ -80,134 +90,69 @@ impl Parser {
         None
     }
     /// Parse a `let` statement
-    fn parse_let(&mut self) -> Option<Node> {
+    fn parse_let(&mut self) -> Result<Node> {
         // Expect a `let` token or send back an error
-        if self.expect_token(TokenType::Let).is_err() {
-            return None;
-        }
+        self.expect_token(TokenType::Let)?;
 
         // Create a new node from the `let` token
-        let mut node = Node::new(
-            Statement(Command::Let),
-            self.peek()?.location,
-            DataType::None,
-            NodeType::Statement,
-        );
+        let mut node = Node::new(NodeType::Let, self.current_token());
 
-        // Make a new identifier node and add it to the `let` node
-        if let Ok(init_identifier) = self.new_identifier() {
-            node.add_child(init_identifier.unwrap());
+        // Tie the identifier to the variable
+        let mut identifier = self.new_identifier()?;
+
+        if self.match_token(TokenType::Assign) {
+            let expr = self.parse_expr(0)?;
+            identifier.add_child(expr);
         }
 
-        // Parse the identifier and make another child node from it
-        //let id_node = self.parse_identifier()?;
-        //node.add_child(id_node);
-        Some(node)
+        node.add_child(identifier);
+        Ok(node)
+    }
+
+    fn parse_datatype(&mut self) -> Result<BaseType> {
+        if let Some(token) = self.peek() {
+            let data_type = match token.token_type {
+                TokenType::DataType(base_type) => base_type,
+                _ => BaseType::NoType,
+            };
+            return Ok(data_type);
+        }
+        Err(anyhow!("Expected a data type"))
     }
 
     /// Parse an identifier into a node
     ///
-    fn new_identifier(&mut self) -> Result<Option<Node>> {
-        //println!("Parsing identifier");
-        let token = self.advance().expect("No token found");
-        if let TokenType::Identifier(name) = token.token_type {
-            let mut idnode = Node::new(
-                Identifier(*name.clone()),
-                token.location,
-                DataType::None,
-                NodeType::Expr,
-            );
-            let next_token = self.peek().expect("No token found");
-
-            // A colon indicates that the data type is specified
-            if next_token.token_type == TokenType::Colon {
-                self.advance();
-                let data_def = self.advance().expect("No data type found");
-
-                idnode.data_type = match data_def.token_type {
-                    TokenType::DataType => match data_def.token_type {
-                        TokenType::Integer(_) => DataType::Integer,
-                        TokenType::Float(_) => DataType::Float,
-                        TokenType::Text(_) => DataType::String,
-                        TokenType::Boolean(_) => DataType::Boolean,
-                        TokenType::Struct(name) => {
-                            //let ident = self.symbol_table.get(&name);
-                            // todo: get the data type from the symbol table
-                            DataType::Struct(0)
-                        }
-                        _ => DataType::None,
-                    },
-                    _ => DataType::None,
-                };
-            }
-
-            // If the type wasn't specified then the data type MUST be inferred from the
-            // assign
-            //println!("Parsing assignment");
-            match next_token.token_type {
-                TokenType::Assign => {
-                    //println!("Found assignment");
-                    self.advance();
-                    let expr = self.parse_expr()?.unwrap();
-                    // Edge case. If the data type was specified then the expression must match
-                    if idnode.data_type != DataType::None && idnode.data_type != expr.data_type {
-                        let msg =
-                            format!("Type mismatch {:?}, {:?}", idnode.data_type, expr.data_type);
-                        bail!(msg);
-                    }
-                    // If not, the node infers the datatype from the expression
-                    idnode.data_type = expr.data_type;
-                    //println!("Data type assigned to identifier {:?}", idnode.data_type);
-
-                    let asg_node = Node::new(
-                        ValueType::AssignmentOperator,
-                        token.location,
-                        idnode.data_type,
-                        NodeType::Statement,
-                    );
-                    idnode.add_child(asg_node);
-                    idnode.add_child(expr);
-                }
-                _ => {
-                    idnode.data_type = DataType::None;
-                }
-            }
-
-            // Final check: we must have a data type assigned to this node. If not, it's because
-            // the data type was not specified and the expression was not parsed
-            if idnode.data_type == DataType::None {
-                bail!("Data type not assigned to identifier");
-            }
-            self.symbol_table
-                .add_symbol(&*name.clone(), idnode.clone().data_type);
-            return Ok(Some(idnode));
+    fn new_identifier(&mut self) -> Result<Node> {
+        if let Some(token) = self.peek() {
+            let mut node = if let TokenType::Identifier(name) = token.token_type {
+                Node::new(
+                    NodeType::Ident(Box::from(name), Box::from(NodeType::Undefined)),
+                    self.current_token(),
+                )
+            } else {
+                return Err(anyhow!("Expected identifier after `let`"));
+            };
+            self.advance();
+            Ok(node)
+        } else {
+            Err(anyhow!("Expected identifier after `let`"))
         }
-        bail!("Expected identifier not found");
     }
 
     pub fn parse(&mut self) -> Result<Node> {
-        let mut node = Node::new(
-            ValueType::Root,
-            Location::new(),
-            DataType::None,
-            NodeType::Statement,
-        );
+        // This is the starting point
+        let mut node = Node::new(NodeType::Root, None);
         while let Some(token) = self.peek() {
             match token.token_type {
                 TokenType::Let => {
-                    if let Some(n) = self.parse_let() {
+                    if let Ok(n) = self.parse_let() {
                         node.add_child(n);
                     }
                 }
                 TokenType::Print => {
                     self.advance();
-                    let expr = self.parse_expr()?.unwrap();
-                    let mut print_node = Node::new(
-                        ValueType::Statement(Command::Print),
-                        token.location,
-                        expr.data_type,
-                        NodeType::Statement,
-                    );
+                    let expr = self.parse_expr(0)?;
+                    let mut print_node = Node::new(NodeType::Print, Some(token));
                     print_node.add_child(expr);
                     node.add_child(print_node);
                 }
@@ -217,7 +162,7 @@ impl Parser {
                     continue;
                 }
                 _ => {
-                    if let Some(n) = self.parse_expr()? {
+                    if let Ok(n) = self.parse_expr(0) {
                         node.add_child(n);
                     } else {
                         bail!("Unexpected token {:?}", token.token_type);
@@ -249,233 +194,107 @@ impl Parser {
         Err(Error::msg(msg))
     }
 
-    fn grouping(&mut self) -> Result<Option<Node>> {
-        let expr = self.parse_expr()?;
-        if self.expect_token(TokenType::RParen).is_err() {
-            bail!("Expected closing parenthesis");
-        }
-        Ok(expr)
-    }
-
-    /// Array
-    fn new_array(&mut self) -> Result<Option<Node>> {
-        let current = self.current;
-        let mut a_node = Node::new(
-            ValueType::Array,
-            self.tokens[current].location,
-            DataType::None,
-            NodeType::Expr,
-        );
-        let mut elem_count = 0;
-        loop {
-            if self.match_token(TokenType::RBracket) {
-                break;
-            }
-            let expr = self.parse_expr()?;
-            a_node.add_child(expr.unwrap());
-            elem_count += 1;
-            if self.match_token(TokenType::Comma) {
-                continue;
-            }
-        }
-        let data_type = if elem_count > 0 {
-            a_node.children[0].data_type
-        } else {
-            DataType::None
-        };
-        a_node.data_type = data_type;
-        Ok(Some(a_node))
-    }
-
-    /// Parse a primary expression which is either a number, a unary operator, or a grouping
-    fn parse_primary(&mut self) -> Result<Option<Node>> {
-        // Check for a unary operator
-        if let Some(mut node) = self.parse_unary()? {
-            let expr = self.parse_expr()?.unwrap();
-            // Update the data type of the unary node based on the expression it's negating
-            node.data_type = expr.data_type;
-            node.add_child(expr);
-            return Ok(Some(node));
-        }
-
+    /// Digs down to the base unit: a number, an identifier, or a parenthesized sub-expression
+    /// We also start by handling unary operators
+    fn parse_primary(&mut self) -> Result<Node> {
         let token = self.peek().expect("No primary token found");
+        let token_type = token.clone().token_type;
 
-        // Check for a grouping
-        if self.match_token(TokenType::LParen) {
-            return self.grouping();
-        }
-        // Creates an array
-        if self.match_token(TokenType::LBracket) {
-            return self.new_array();
-        }
-
-        let node = match token.token_type {
+        match token_type {
+            // Value operands
             TokenType::Integer(value) => {
                 self.advance();
-                Some(Node::new(
-                    ValueType::Integer(value),
-                    token.location,
-                    DataType::Integer,
-                    NodeType::Expr,
+                Ok(Node::new(NodeType::Integer(value), Some(token.clone())))
+            }
+            TokenType::Boolean(value) => {
+                self.advance();
+                Ok(Node::new(NodeType::Boolean(value), Some(token.clone())))
+            }
+            TokenType::Text(value) => {
+                self.advance();
+                Ok(Node::new(
+                    NodeType::Text(Box::new(value)),
+                    Some(token.clone()),
                 ))
             }
             TokenType::Float(value) => {
                 self.advance();
-                Some(Node::new(
-                    ValueType::Float(value),
-                    token.location,
-                    DataType::Float,
-                    NodeType::Expr,
-                ))
-            }
-            TokenType::Text(value) => {
-                self.advance();
-                Some(Node::new(
-                    ValueType::Text(value),
-                    token.location,
-                    DataType::String,
-                    NodeType::Expr,
-                ))
+                Ok(Node::new(NodeType::Float(value), Some(token.clone())))
             }
             TokenType::Identifier(name) => {
                 self.advance();
-                let data_type = if let Some(item) = self.symbol_table.get(&name) {
-                    item.data_type
-                } else {
-                    DataType::None
-                };
-
-                let mut var =
-                    Node::new(Identifier(*name), token.location, data_type, NodeType::Expr);
-
-                if let Some(tok) = self.peek() {
-                    match tok.token_type {
-                        TokenType::LBracket => {
-                            self.advance();
-                            let expr = self.parse_expr()?.unwrap();
-                            self.expect_token(TokenType::RBracket)?;
-                            let mut index = Node::new(
-                                ValueType::ElementIndex,
-                                token.location,
-                                data_type,
-                                NodeType::Expr,
-                            );
-                            index.add_child(expr);
-                            var.add_child(index);
-                        }
-                        _ => {}
-                    }
-                }
-                Some(var)
+                self.new_identifier()
             }
-            TokenType::EOF => None,
-            _ => bail!("Unexpected token {:?}", token.token_type),
-        };
+            TokenType::LParen => {
+                self.advance();
+                let expr = self.parse_expr(0)?;
+                self.expect_token(TokenType::RParen)?;
+                Ok(expr)
+            }
+            // Unary operators
+            TokenType::Plus => {
+                self.advance();
+                // A plus has no effect as a unary operator, so just try and get the next one
+                self.parse_primary()
+            }
+            TokenType::Minus => self.parse_unary(token, UnOp::Neg),
+            TokenType::Bang => self.parse_unary(token, UnOp::Not),
+            _ => Err(anyhow!(format!("Unexpected token {:?}", token.token_type))),
+        }
+    }
 
+    fn parse_unary(&mut self, token: Token, unop: UnOp) -> Result<Node> {
+        self.advance();
+        // After the unary, we recursively call the function to get at the
+        // value being negated
+        let u_node = self.parse_primary()?;
+        let mut node = Node::new(NodeType::UnaryOp(unop), Some(token));
+        node.add_child(u_node);
         Ok(node)
     }
 
-    fn parse_unary(&mut self) -> Result<Option<Node>> {
-        let token = self.peek().expect("No unary token found");
-
-        let node = match token.token_type {
-            TokenType::Minus => {
-                self.advance();
-                Some(Node::new(
-                    ValueType::UnaryOperator(UnaryOp::Neg),
-                    token.location,
-                    DataType::Integer,
-                    NodeType::Op,
-                ))
-            }
-            TokenType::Bang => {
-                self.advance();
-                Some(Node::new(
-                    ValueType::UnaryOperator(UnaryOp::Not),
-                    token.location,
-                    DataType::Integer,
-                    NodeType::Op,
-                ))
-            }
-            _ => None,
-        };
-        Ok(node)
-    }
-
-    fn parse_term(&mut self) -> Result<Option<Node>> {
-        // First check if the token is a number or grouping token
+    fn parse_expr(&mut self, min_prec: u8) -> Result<Node> {
+        // First, parse a primary expression (a number or parenthesized expr)
         let mut node = self.parse_primary()?;
 
+        // Now, try to consume operators that have at least 'min_prec'
         loop {
+            let mut is_right_associative = false;
             let token = self.peek().expect("No term token found");
-            let op = match token.token_type {
-                TokenType::Star => BinOp::Mul,
-                TokenType::Slash => BinOp::Div,
-                _ => break,
+            let token_type = token.clone().token_type;
+
+            let (prec, op) = match token_type {
+                Plus => (10, BinOp::Add),
+                Minus => (10, BinOp::Sub),
+                Star => (20, BinOp::Mul),
+                Slash => (20, BinOp::Div),
+                Caret => {
+                    is_right_associative = true;
+                    (30, BinOp::Pow)
+                }
+                _ => break, // no operator, stop
             };
-            self.advance();
-            let right = self.parse_primary()?;
 
-            let rdata_type = right.clone().unwrap().data_type;
-            let ldata_type = node.clone().unwrap().data_type;
-
-            if rdata_type != ldata_type {
-                let msg = format!("Type mismatch {:?}, {:?}", rdata_type, ldata_type);
-                bail!(msg);
+            if prec < min_prec {
+                break; // operator not strong enough to continue
             }
 
-            let left = node.clone().unwrap();
-            let right = right.unwrap();
-            let mut t_node = Node::new(BinOperator(op), token.location, rdata_type, NodeType::Op);
-            t_node.add_child(right);
-            t_node.add_child(left);
-            node = Some(t_node);
-        }
-
-        Ok(node)
-    }
-
-    /// Parses expressions (things that return a value)
-    fn parse_expr(&mut self) -> Result<Option<Node>> {
-        // First check if there is a higher precedence operator
-        let mut node = self.parse_term()?;
-
-        loop {
-            // If the next peeked value is None, then we're done
-            let token = self.peek().expect("No expression token found");
-
-            let op = match token.token_type {
-                TokenType::Plus => BinOp::Add,
-                TokenType::Minus => BinOp::Sub,
-                _ => break,
-            };
+            // Consume the operator
             self.advance();
 
-            let right = self.parse_term()?;
+            // If operator is right-associative, we use the same precedence level,
+            // else we use prec + 1 for the RHS to ensure correct associativity
+            let next_min_prec = if is_right_associative { prec } else { prec + 1 };
 
-            if let None = right {
-                self.raise_error("Missing right side of expression");
-                bail!("parse error");
-            }
-            let right = right.unwrap();
+            // Recursively parse the RHS with the updated minimum precedence
+            let rhs = self.parse_expr(next_min_prec)?;
+            let lhs = node.clone();
 
-            let rdata_type = right.clone().data_type;
-
-            let ldata_type = node.clone().unwrap().data_type;
-
-            if rdata_type != ldata_type {
-                let msg = format!("Type mismatch {:?}, {:?}", rdata_type, ldata_type);
-                self.raise_error(&msg);
-                bail!(msg);
-            }
-
-            let mut new_node =
-                Node::new(BinOperator(op), token.location, rdata_type, NodeType::Leaf);
-
-            new_node.add_child(right);
-            new_node.add_child(node.unwrap());
-            node = Some(new_node);
+            node = Node::new(BinaryOp(op), Some(token));
+            node.add_child(rhs);
+            node.add_child(lhs);
         }
+
         Ok(node)
     }
 }

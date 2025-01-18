@@ -1,10 +1,58 @@
-#[derive(Clone, PartialOrd, PartialEq, Debug)]
+use std::collections::HashMap;
+use std::fmt::Display;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum BaseType {
+    NoType,
+    Undefined,
+    Integer,
+    Float,
+    Text,
+    Boolean,
+    Array,
+    List,
+    Struct,
+}
+
+impl Display for BaseType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BaseType::NoType => write!(f, "NoType"),
+            BaseType::Undefined => write!(f, "Undefined"),
+            BaseType::Integer => write!(f, "Integer"),
+            BaseType::Float => write!(f, "Float"),
+            BaseType::Text => write!(f, "Text"),
+            BaseType::Boolean => write!(f, "Boolean"),
+            BaseType::Array => write!(f, "Array"),
+            BaseType::List => write!(f, "List"),
+            BaseType::Struct => write!(f, "Struct"),
+        }
+    }
+}
+
+impl BaseType {
+    pub fn get_prefix(&self) -> String {
+        match self {
+            BaseType::NoType => "".to_string(),
+            BaseType::Integer => "i".to_string(),
+            BaseType::Float => "f".to_string(),
+            BaseType::Text => "t".to_string(),
+            BaseType::Boolean => "b".to_string(),
+            BaseType::Array => "a".to_string(),
+            BaseType::List => "l".to_string(),
+            BaseType::Struct => "s".to_string(),
+            BaseType::Undefined => "u".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum TokenType {
-    Integer(i64),
+    Integer(f64), // Integers are represented by floats
     Float(f64),
-    Text(Box<String>),
+    Text(String),
     Boolean(bool),
-    Struct(Box<String>),
+    Struct(HashMap<String, BaseType>),
     LBracket,
     RBracket,
     LParen,
@@ -34,8 +82,8 @@ pub enum TokenType {
     Newline,
     Dollar,
     Quote,
-    DataType,
-    Identifier(Box<String>),
+    DataType(BaseType),
+    Identifier(String),
     Let,
     Func,
     Print,

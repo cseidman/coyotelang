@@ -1,39 +1,89 @@
-pub const HALT: u8 = 0;
-pub const IMOV: u8 = 1;
-pub const IADD: u8 = 2;
-pub const ISUB: u8 = 3;
-pub const IMUL: u8 = 4;
-pub const IDIV: u8 = 5;
-pub const IEQU: u8 = 6;
-pub const FMOV: u8 = 7;
-pub const FADD: u8 = 8;
-pub const FSUB: u8 = 9;
-pub const FMUL: u8 = 10;
-pub const FDIV: u8 = 11;
-pub const STORE: u8 = 12;
-pub const LOAD: u8 = 13;
-pub const IDEC: u8 = 14;
-pub const CMP: u8 = 15;
-pub const IINC: u8 = 16;
-pub const IPRINT: u8 = 17;
-pub const INEG: u8 = 18;
-pub const SPRINT: u8 = 19;
-pub const SMOV: u8 = 20;
-pub const ICONST: u8 = 21;
-pub const FCONST: u8 = 22;
-pub const SCONST: u8 = 23;
-pub const FPRINT: u8 = 24;
-pub const FNEG: u8 = 25;
-pub const NEWARRAY: u8 = 26;
-pub const IMOVA: u8 = 27;
-pub const FMOVA: u8 = 28;
-pub const SMOVA: u8 = 29;
-pub const IAPRINT: u8 = 30;
-pub const ASTORE: u8 = 31;
-pub const ALOAD: u8 = 32;
-pub const INSTRUCTIONS: [&str; 33] = [
-    "HALT", "IMOV", "IADD", "ISUB", "IMUL", "IDIV", "IEQU", "FMOV", "FADD", "FSUB", "FMUL", "FDIV",
-    "STORE", "LOAD", "IDEC", "CMP", "IINC", "IPRINT", "INEG", "SPRINT", "SMOV", "ICONST", "FCONST",
-    "SCONST", "FPRINT", "FNEG", "NEWARRAY", "IMOVA", "FMOVA", "SMOVA", "IAPRINT", "ASTORE",
-    "ALOAD",
-];
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Instruction {
+    Halt = 0,
+    Push = 1,
+    Add = 2,
+    Sub = 3,
+    Mul = 4,
+    Div = 5,
+    Equ = 6,
+    Store = 7,
+    Pop = 8,
+    Cmp = 9,
+    Print = 10,
+    Neg = 11,
+    Const = 12,
+    Newarray = 13,
+    Load = 14,
+}
+
+impl Instruction {
+    pub const INSTRUCTIONS: [&'static str; 15] = [
+        "halt",     // 0
+        "push",     // 1
+        "add",      // 2
+        "sub",      // 3
+        "mul",      // 4
+        "div",      // 5
+        "equ",      // 6
+        "store",    // 7
+        "pop",      // 8
+        "cmp",      // 9
+        "print",    // 10
+        "neg",      // 11
+        "const",    // 12
+        "newarray", // 13
+        "load",     // 14
+    ];
+
+    /// Return the human-readable name of this instruction.
+    pub fn as_str(&self) -> &'static str {
+        Self::INSTRUCTIONS[*self as usize]
+    }
+
+    /// Convert a `u8` opcode into an `Instruction` (if it’s valid).
+    pub fn from_u8(opcode: u8) -> Self {
+        match opcode {
+            0 => Instruction::Halt,
+            1 => Instruction::Push,
+            2 => Instruction::Add,
+            3 => Instruction::Sub,
+            4 => Instruction::Mul,
+            5 => Instruction::Div,
+            6 => Instruction::Equ,
+            7 => Instruction::Store,
+            8 => Instruction::Pop,
+            9 => Instruction::Cmp,
+            10 => Instruction::Print,
+            11 => Instruction::Neg,
+            12 => Instruction::Const,
+            13 => Instruction::Newarray,
+            14 => Instruction::Load,
+            _ => {
+                panic!("Unknown opcode {}", opcode);
+            }
+        }
+    }
+
+    pub fn match_instruction(s: &str) -> Option<Instruction> {
+        match s {
+            "halt" => Some(Instruction::Halt),
+            "push" => Some(Instruction::Push),
+            "add" => Some(Instruction::Add),
+            "sub" => Some(Instruction::Sub),
+            "mul" => Some(Instruction::Mul),
+            "div" => Some(Instruction::Div),
+            "equ" => Some(Instruction::Equ),
+            "store" => Some(Instruction::Store),
+            "pop" => Some(Instruction::Pop),
+            "cmp" => Some(Instruction::Cmp),
+            "print" => Some(Instruction::Print),
+            "neg" => Some(Instruction::Neg),
+            "const" => Some(Instruction::Const),
+            "newarray" => Some(Instruction::Newarray),
+            "load" => Some(Instruction::Load),
+            _ => None,
+        }
+    }
+}

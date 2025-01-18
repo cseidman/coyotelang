@@ -1,30 +1,90 @@
 #![allow(dead_code)]
 
-const NONE: u8 = 0;
-const FLOAT: u8 = 1;
-const BOOLEAN: u8 = 2;
-const POINTER: u8 = 3;
-const INDEX: u8 = 4;
-const BYTES: u8 = 5;
-const INTEGER: u8 = 6;
-const BYTE: u8 = 7;
+use std::cmp::PartialEq;
+use std::fmt::{Display, Formatter};
+use std::ops::{Add, Mul};
 
-const UINT: u8 = 8;
+#[repr(u8)]
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum DataTag {
+    Nil = 0,
+    Float = 1,
+    Bool = 2,
+    Pointer = 3,
+    Char = 4,
+    Integer = 5,
+    Byte = 6,
+    UInt = 7,
+}
+
+impl From<u8> for DataTag {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => DataTag::Nil,
+            1 => DataTag::Float,
+            2 => DataTag::Bool,
+            3 => DataTag::Pointer,
+            4 => DataTag::Char,
+            5 => DataTag::Integer,
+            6 => DataTag::Byte,
+            7 => DataTag::UInt,
+            _ => {
+                panic!("unknown tag")
+            }
+        }
+    }
+}
 
 #[derive(Copy, Clone)]
-pub(crate) union Value {
+pub struct Object {
+    pub tag: DataTag,
+    pub data: Value,
+}
+
+impl Display for Object {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.tag {
+            DataTag::Nil => {
+                write!(f, "nil")
+            }
+            DataTag::Float => {
+                write!(f, "{}", self.data.as_float())
+            }
+            DataTag::Bool => {
+                write!(f, "{}", self.data.as_bool())
+            }
+            DataTag::Pointer => {
+                write!(f, "*ptr")
+            }
+            DataTag::Char => {
+                write!(f, "{}", unsafe { self.data.byte })
+            }
+            DataTag::Integer => {
+                write!(f, "{}", self.data.as_float())
+            }
+            DataTag::Byte => {
+                write!(f, "{}", unsafe { self.data.byte })
+            }
+            DataTag::UInt => {
+                write!(f, "{}", self.data.as_uint())
+            }
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub union Value {
     pub i: i64,
     pub f: f64,
     pub b: bool,
     pub ptr: *const u8,
-    pub index: u32,
     pub bytes: [u8; 8],
     pub uint: usize,
     pub byte: u8,
 }
 impl Value {
     pub fn as_integer(&self) -> i64 {
-        unsafe { self.i }
+        unsafe { self.f as i64 }
     }
     pub fn as_float(&self) -> f64 {
         unsafe { self.f }
@@ -42,10 +102,6 @@ impl Value {
         unsafe { self.ptr }
     }
 
-    pub fn as_index(&self) -> u32 {
-        unsafe { self.index }
-    }
-
     pub fn as_uint(&self) -> usize {
         unsafe { self.uint }
     }
@@ -54,6 +110,7 @@ impl Value {
         unsafe { self.byte }
     }
 }
+
 #[repr(C)]
 pub struct Array {
     pub data_type: u8,
