@@ -172,7 +172,7 @@ impl Vm {
                 }
 
                 Halt => unsafe {
-                    println!("{}", self.pop());
+                    println!("\n{}", self.pop());
                     break;
                 },
                 _ => {

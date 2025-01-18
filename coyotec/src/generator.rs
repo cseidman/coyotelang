@@ -162,6 +162,7 @@ impl IrGenerator {
                         token_type
                     );
                 };
+
                 let data_type = node.return_type;
 
                 // Check the next child in an assignment operator
