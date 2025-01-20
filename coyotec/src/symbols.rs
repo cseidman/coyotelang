@@ -15,41 +15,51 @@ impl Item {
     }
 }
 #[derive(Clone)]
-pub struct Symbol {
+pub struct Symbols {
     pub symbols: HashMap<String, Item>,
-    pub register: Option<usize>,
 }
 
-impl Symbol {
+impl Symbols {
     pub fn new() -> Self {
         Self {
             symbols: HashMap::new(),
-            register: None,
         }
     }
 
     fn add_symbol(&mut self, name: &str, data_type: DataType) {
+        // The same variable cannot be declared in the same scope
+        if self.symbols.contains_key(name) {
+            panic!("Symbol '{}' already exists!", name);
+        }
         self.symbols.insert(name.to_string(), Item::new(data_type));
     }
 
-    /// Get the item for a given identifier name. If the name is not in the map
-    /// it creates a new entry in the symbol table and returns the unique number
+    /// Get the item for a given identifier name
     pub fn get(&mut self, name: &str) -> Option<Item> {
         self.symbols.get(name).cloned()
+    }
+
+    /// Assign data type
+    pub fn set_data_type(&mut self, name: &str, data_type: DataType) {
+        if let Some(symbol) = self.symbols.get_mut(name) {
+            symbol.data_type = data_type;
+            return;
+        }
+        panic!("Symbol '{}' does not exist!", name);
     }
 }
 
 /// A symbol table is a collection of symbol names. Each symbol name is a map of identifier
 #[derive(Clone)]
 pub struct SymbolTable {
-    pub symbols: Vec<Symbol>,
+    pub symbols: Vec<Symbols>,
     scope: usize,
 }
 
 impl SymbolTable {
     pub fn new() -> Self {
         Self {
-            symbols: vec![Symbol::new()],
+            symbols: vec![Symbols::new()],
             scope: 0,
         }
     }
@@ -67,7 +77,7 @@ impl SymbolTable {
 
     /// Push a new scope onto the symbol table
     pub fn push_scope(&mut self) {
-        self.symbols.push(Symbol::new());
+        self.symbols.push(Symbols::new());
         self.scope += 1;
     }
 

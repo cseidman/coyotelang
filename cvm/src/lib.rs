@@ -1,3 +1,5 @@
+#![feature(random)]
+
 pub mod constants;
 mod ctable;
 mod heap;

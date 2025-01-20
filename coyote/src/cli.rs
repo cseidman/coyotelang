@@ -108,17 +108,17 @@ fn repl<'a>() -> Result<()> {
                 parser.add_tokens(tokens, line);
 
                 if let Ok(node) = parser.parse() {
-                    display_tree(&node);
+                    //display_tree(&node);
 
                     // Generate the assembly code
                     generator.generate(&node);
                     let asm = format!("{}", generator);
-                    println!("{}", asm);
+                    //println!("{}", asm);
 
                     // Assemble the assembly code into bytecode
                     let bytecode = assemble(&asm);
                     vm.code = bytecode;
-                    println!("{:?}", &vm.code);
+                    //println!("{:?}", &vm.code);
                     vm.run()
                 } else {
                     bail!("Error parsing");

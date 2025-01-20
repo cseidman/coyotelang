@@ -6,6 +6,7 @@ use crate::{
     constants::Instruction::*,
     valuetypes::{DataTag, Object, Value},
 };
+use rand::{random, random_range};
 use std::{result, usize};
 
 pub struct Vm {
@@ -26,7 +27,7 @@ impl Vm {
 
         Self {
             stack: [obj; 64000],
-            sp: 0,
+            sp: 16,
             code: Vec::new(),
             heap: Heap::new(),
             string_pool: Vec::new(),
@@ -47,9 +48,11 @@ impl Vm {
     }
 
     fn get_integer(&mut self) -> usize {
+        self.ip += 1;
         let bytes: [u8; 8] = self.code[self.ip..self.ip + 8].try_into().unwrap();
+
         self.ip += 8;
-        usize::from_le_bytes(bytes)
+        f64::from_le_bytes(bytes) as usize
     }
 
     fn get_byte(&mut self) -> u8 {
@@ -68,9 +71,6 @@ impl Vm {
         self.sp += 1;
     }
 
-    fn load(&mut self) {}
-
-    fn store(&mut self) {}
     /// Gets the value that exists following the `const` instruction
     fn get_const(&mut self) -> Object {
         // The const has already been consumed so the next byte tells us the type
@@ -97,11 +97,24 @@ impl Vm {
         }
     }
 
+    /// Read the number of constants and use that as the basis for the starting position on the
+    /// stack
+    fn load_globals(&mut self) -> usize {
+        let start = self.ip;
+        let num_constants = u32::from_le_bytes(self.code[start..(start + 4)].try_into().unwrap());
+        self.ip += 4;
+        num_constants as usize
+    }
+
     pub fn run(&mut self) {
-        println!("Loading constants");
+        //println!("Loading constants");
         self.ip = 0;
         self.load_string_pool();
-        println!("Executing code ..");
+
+        let globals = self.load_globals();
+        //println!("Globals: {globals}");
+
+        //println!("Executing code ..");
 
         macro_rules! binop {
             ($op:tt) => {
@@ -112,7 +125,10 @@ impl Vm {
                 let left_tag = left.tag;
                 let right_tag = right.tag;
 
-                let result_value = left.data.as_float() $op right.data.as_float();
+                let ldata = left.data.as_float();
+                let rdata = right.data.as_float();
+
+                let result_value:f64 = ldata $op rdata;
 
                 let result_tag = match (left_tag, right_tag) {
                     (DataTag::Integer, DataTag::Integer) => DataTag::Integer,
@@ -129,16 +145,12 @@ impl Vm {
             };
         }
 
-        println!("\nVM Debug");
-        println!("--------");
+        //println!("\nVM Debug");
+        //println!("--------");
         loop {
             let b = self.get_instruction();
-            println!("{} ", b.as_str());
+            //println!("{} ", b.as_str());
             match b {
-                Load => {
-                    self.load();
-                }
-
                 Push => {
                     let obj = self.get_const();
                     self.push(obj);
@@ -163,26 +175,33 @@ impl Vm {
                 Neg => {}
 
                 Newarray => {}
-                Store => {}
-
+                Store => {
+                    let slot = self.get_integer();
+                    self.stack[slot as usize] = self.pop();
+                }
+                Load => {
+                    let slot = self.get_integer();
+                    let obj = self.stack[slot as usize];
+                    self.push(obj);
+                }
                 Pop => {}
 
                 Print => {
                     self.print();
                 }
 
-                Halt => unsafe {
-                    println!("\n{}", self.pop());
+                Halt => {
+                    //println!("\n{}", self.pop());
                     break;
-                },
+                }
                 _ => {
                     println!("Unknown instruction: {}", b.as_str());
                     break;
                 }
             }
 
-            //for i in 0..5 {
-            //    print!("[{}]\t", self.registers[i].as_integer());
+            //for i in ((sp + 16)..(starting_sp + 26)) {
+            //    print!("[{}] ", self.stack[i]);
             //}
             //println!();
         }
@@ -191,7 +210,8 @@ impl Vm {
     }
 
     fn print(&mut self) {
-        let value = self.stack[self.sp];
+        let value = self.pop();
+        println!("{}", value);
     }
 }
 

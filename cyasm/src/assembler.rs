@@ -2,7 +2,7 @@
 use cvm::constants::*;
 use cvm::valuetypes::DataTag;
 use std::iter::Peekable;
-use std::str::Chars;
+use std::str::{Chars, FromStr};
 
 struct AsmParser<'a> {
     asm: Peekable<Chars<'a>>,
@@ -62,6 +62,14 @@ impl<'a> AsmParser<'a> {
         line
     }
 
+    fn write_global_slots(&mut self) {
+        self.get_line(); // clear the .globals tag
+        let line = self.get_line();
+        let gcount = line.trim();
+        let global_count = gcount.parse::<u32>().unwrap();
+        self.bytecode
+            .append(&mut global_count.to_le_bytes().to_vec());
+    }
     fn write_constants(&mut self) {
         // Load all the constants after the .constants directive
         let mut const_count: u32 = 0;
@@ -75,12 +83,8 @@ impl<'a> AsmParser<'a> {
                 continue;
             }
 
-            // Add the count as 4 byte integer
-            // self.bytecode
-            // .append(&mut const_count.to_le_bytes().to_vec());
-
             // Add the length of the string as a 4 byte integer
-            let constant = line.trim();
+            let constant = line;
             let mut const_bytes = constant.as_bytes().to_vec();
             let const_len: u32 = const_bytes.len() as u32;
             self.bytecode.append(&mut const_len.to_le_bytes().to_vec());
@@ -89,7 +93,7 @@ impl<'a> AsmParser<'a> {
             self.bytecode.append(&mut const_bytes);
             const_count += 1;
         }
-        println!("Constant count: {}", const_count);
+        //println!("Constant count: {}", const_count);
         // Add the count of constants as the first 4 bytes
         for b in const_count.to_be_bytes().to_vec() {
             self.bytecode.insert(0, b);
@@ -100,6 +104,11 @@ impl<'a> AsmParser<'a> {
         while let Some(&c) = self.asm.peek() {
             if self.match_string(".constants") {
                 self.write_constants();
+                continue;
+            }
+
+            if self.match_string(".globals") {
+                self.write_global_slots();
                 continue;
             }
 
@@ -125,12 +134,14 @@ impl<'a> AsmParser<'a> {
                         str_val.push(chr)
                     }
                 }
+                continue;
             }
 
             if c.is_alphabetic() {
                 self.advance();
                 let mut s = String::new();
                 s.push(c);
+
                 while let Some(&c) = self.asm.peek() {
                     if c.is_alphabetic() {
                         s.push(c);
@@ -142,8 +153,9 @@ impl<'a> AsmParser<'a> {
 
                 if let Some(byte) = self.match_keyword(&s) {
                     self.emit_command(byte as u8);
-                    continue;
                 }
+
+                continue;
             }
 
             if c.is_ascii_digit() {
@@ -176,11 +188,6 @@ impl<'a> AsmParser<'a> {
         self.bytecode.append(&mut bytes);
     }
 
-    fn emit_register(&mut self, reg_number: u16) {
-        let mut reg = reg_number.to_le_bytes().to_vec();
-        self.bytecode.append(&mut reg);
-    }
-
     fn match_keyword(&self, keyword: &str) -> Option<Instruction> {
         Instruction::match_instruction(keyword)
     }
@@ -189,12 +196,4 @@ impl<'a> AsmParser<'a> {
 pub fn assemble(asm: &str) -> Vec<u8> {
     let mut parser = AsmParser::new(asm);
     parser.assemble()
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_asm_parser() {}
 }

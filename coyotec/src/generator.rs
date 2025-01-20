@@ -1,7 +1,6 @@
 //! Reads the AST and generates IR in SSA form
 #![allow(dead_code, unused_variables)]
 
-use crate::allocator::Registers;
 use crate::ast::node::{BinOp, NodeType, UnOp};
 use crate::ast::tree::{Command, Node, ValueType};
 use crate::datatypes::datatype::DataType;
@@ -15,12 +14,12 @@ use std::fmt::{Display, Formatter};
 /// The IR will be in SSA form
 
 pub struct IrGenerator {
-    registers: Registers,
     instructions: Vec<String>,
     string_pool: Vec<String>,
     strings_index: usize,
+
     scope: usize,
-    symbol_regs: Vec<HashMap<String, usize>>,
+    symbol_loc: Vec<String>,
 }
 
 pub fn generate(node: &Node) -> String {
@@ -37,11 +36,12 @@ impl Display for IrGenerator {
             writeln!(f, "    {}", s)?;
         }
         writeln!(f, ".end")?;
-        //writeln!(f, ".instructions")?;
+        writeln!(f, ".globals")?;
+        writeln!(f, "    {}", self.symbol_loc.len())?;
+
         for line in &self.instructions {
             writeln!(f, "{line}")?;
         }
-        //writeln!(f, ".end")?;
         writeln!(f, "")
     }
 }
@@ -49,12 +49,11 @@ impl Display for IrGenerator {
 impl IrGenerator {
     pub fn new(node: &Node) -> Self {
         Self {
-            registers: Registers::new(1024000),
             instructions: Vec::new(),
             string_pool: Vec::new(),
             strings_index: 0,
             scope: 0,
-            symbol_regs: vec![HashMap::new()],
+            symbol_loc: vec![],
         }
     }
 
@@ -78,13 +77,16 @@ impl IrGenerator {
     }
 
     fn store_variable(&mut self, name: &str) -> usize {
-        let reg = self.registers.allocate();
-        self.symbol_regs[self.scope].insert(name.to_string(), reg);
-        reg
+        let loc = self.symbol_loc.len();
+        self.symbol_loc.push(name.to_string());
+        loc
     }
 
-    fn get_variable(&mut self, name: &str) -> Option<usize> {
-        self.symbol_regs[self.scope].get(name).copied()
+    fn get_variable(&mut self, name: &str) -> usize {
+        if let Some(index) = self.symbol_loc.iter().position(|x| x == name) {
+            return index;
+        }
+        panic!("Variable '{name}' not found in symbol loc");
     }
 
     fn push(&mut self, instruction: String) {
@@ -164,13 +166,13 @@ impl IrGenerator {
                 };
 
                 let data_type = node.return_type;
-
+                let location = self.store_variable(&var_name);
                 // Check the next child in an assignment operator
                 if let Some(next_node) = node.children.get(0) {
                     // Generate the expression that gets assigned to the variable
                     self.generate_code(next_node);
 
-                    self.push(format!("store ;",));
+                    self.push(format!("store {location} ;",));
                 }
             }
             NodeType::Print => {
@@ -179,18 +181,9 @@ impl IrGenerator {
                 }
                 self.push(format!("print ;"));
             }
-            NodeType::Ident(name, node_type) => {
-                if let Some(var_reg) = self.get_variable(&name) {
-                    // Allocate register to store the variable
-
-                    // Load the contents of the location of the variable to the newly
-                    // allocated register
-                    self.push(format!("load {var_reg}"));
-
-                    for child in &node.children {}
-                } else {
-                    panic!("Variable {} not found", name);
-                }
+            NodeType::Ident(name) => {
+                let index = self.get_variable(&name);
+                self.push(format!("load {index};"));
             }
             // We don't need to capture the internal elements here because we're drilling
             // down into the elements
@@ -201,7 +194,6 @@ impl IrGenerator {
                     self.generate_code(child);
                 }
             }
-
             _ => {
                 println!(".end")
             }

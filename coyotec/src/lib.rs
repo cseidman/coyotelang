@@ -2,7 +2,6 @@ pub mod compiler;
 pub mod lexer;
 pub mod tokens;
 
-mod allocator;
 mod arena;
 pub mod ast;
 pub mod datatypes;

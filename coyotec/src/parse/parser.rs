@@ -13,11 +13,10 @@ use std::collections::HashMap;
 use anyhow::{anyhow, bail, Error, Result};
 use std::slice::Iter;
 
-use crate::allocator::Registers;
 use crate::ast::node::NodeType::*;
 use crate::ast::node::UnOp::Neg;
 use crate::ast::node::{BinOp, Node, NodeType, UnOp};
-use crate::symbols::{Symbol, SymbolTable};
+use crate::symbols::{SymbolTable, Symbols};
 use crate::tokens::{BaseType::*, TokenType::*};
 use crate::{tokens, Deferable};
 
@@ -42,6 +41,23 @@ impl Parser {
             symbol_table: SymbolTable::new(),
             has_error: false,
         }
+    }
+
+    /// Register new variable in the symbol table
+    fn register_variable(&mut self, variable_name: &str, data_type: DataType) {
+        self.symbol_table.add_symbol(variable_name, data_type);
+    }
+
+    fn variable_exists(&mut self, variable_name: &str) -> bool {
+        self.symbol_table.get(variable_name).is_some()
+    }
+
+    fn push_scope(&mut self) {
+        self.symbol_table.push_scope();
+    }
+
+    fn pop_scope(&mut self) {
+        self.symbol_table.pop_scope();
     }
 
     fn current_token(&self) -> Option<Token> {
@@ -124,11 +140,12 @@ impl Parser {
     ///
     fn new_identifier(&mut self) -> Result<Node> {
         if let Some(token) = self.peek() {
-            let mut node = if let TokenType::Identifier(name) = token.token_type {
-                Node::new(
-                    NodeType::Ident(Box::from(name), Box::from(NodeType::Undefined)),
-                    self.current_token(),
-                )
+            let node = if let TokenType::Identifier(name) = token.token_type {
+                // Register the new variable in the symbol table
+                self.register_variable(&name, DataType::None);
+
+                // Create the identifier node
+                Node::new(NodeType::Ident(Box::from(name)), self.current_token())
             } else {
                 return Err(anyhow!("Expected identifier after `let`"));
             };
@@ -223,7 +240,13 @@ impl Parser {
             }
             TokenType::Identifier(name) => {
                 self.advance();
-                self.new_identifier()
+                // Check if the value is in the symbol table
+                if !self.variable_exists(&name) {
+                    panic!("Variable '{}' does not exist in this scope", name);
+                }
+                let varname = Box::new(name.to_string());
+                let node = Node::new(Ident(varname), self.current_token());
+                Ok(node)
             }
             TokenType::LParen => {
                 self.advance();
