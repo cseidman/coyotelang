@@ -1,7 +1,6 @@
-use crate::ast::tree::ValueType;
 use crate::tokens::BaseType::Undefined;
-use crate::tokens::{BaseType, Location, Token};
-use std::fmt::{write, Display, Formatter};
+use crate::tokens::{BaseType, Token};
+use std::fmt::Display;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BinOp {
@@ -12,6 +11,7 @@ pub enum BinOp {
     Pow,
     And,
     Or,
+    Assign,
 }
 
 impl Display for BinOp {
@@ -24,6 +24,7 @@ impl Display for BinOp {
             BinOp::Pow => write!(f, "pow"),
             BinOp::And => write!(f, "and"),
             BinOp::Or => write!(f, "or"),
+            BinOp::Assign => write!(f, "or"),
         }
     }
 }
@@ -50,7 +51,7 @@ pub enum NodeType {
     Boolean(bool),
     Text(Box<String>),
     Ident(Box<String>),
-    Array(Box<NodeType>),
+    Array,
     UnaryOp(UnOp),
     BinaryOp(BinOp),
     Function(Box<Vec<NodeType>>),
@@ -70,7 +71,7 @@ impl Display for NodeType {
             NodeType::Boolean(b) => write!(f, "Boolean:{}", b),
             NodeType::Text(t) => write!(f, "{}", t),
             NodeType::Ident(t) => write!(f, "Ident:{}", t),
-            NodeType::Array(t) => write!(f, "Array:{}", t),
+            NodeType::Array => write!(f, "Array"),
             NodeType::UnaryOp(UnOp::Neg) => write!(f, "neg"),
             NodeType::UnaryOp(UnOp::Not) => write!(f, "not"),
             NodeType::BinaryOp(BinOp::Add) => write!(f, "add"),
@@ -80,6 +81,7 @@ impl Display for NodeType {
             NodeType::BinaryOp(BinOp::Pow) => write!(f, "pow"),
             NodeType::BinaryOp(BinOp::And) => write!(f, "and"),
             NodeType::BinaryOp(BinOp::Or) => write!(f, "or"),
+            NodeType::BinaryOp(BinOp::Assign) => write!(f, "assign"),
             NodeType::Function(_) => write!(f, "function"),
             NodeType::Assignment => write!(f, "assignment"),
             NodeType::Let => write!(f, "let"),
@@ -95,6 +97,7 @@ pub struct Node {
     pub token: Option<Token>,
     // This gets filled in a subsequent pass
     pub return_type: BaseType,
+    pub can_assign: bool,
 }
 
 impl Display for Node {
@@ -110,6 +113,7 @@ impl Node {
             children: vec![],
             token,
             return_type: Undefined,
+            can_assign: false,
         }
     }
 

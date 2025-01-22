@@ -6,11 +6,9 @@ use rustyline::DefaultEditor;
 
 use clap::Parser;
 use colored::Colorize;
-use coyotec::ast::node::{display_tree, NodeType};
-use coyotec::ast::tree::ValueType;
+use coyotec::ast::node::NodeType;
 use coyotec::ast::Node;
 use coyotec::compiler::compile;
-use coyotec::datatypes::datatype::DataType;
 use coyotec::generator::IrGenerator;
 use coyotec::lexer::{lex, SourceType};
 use coyotec::parse::parser;
@@ -108,12 +106,12 @@ fn repl<'a>() -> Result<()> {
                 parser.add_tokens(tokens, line);
 
                 if let Ok(node) = parser.parse() {
-                    //display_tree(&node);
+                    //coyotec::ast::node::display_tree(&node);
 
                     // Generate the assembly code
                     generator.generate(&node);
                     let asm = format!("{}", generator);
-                    //println!("{}", asm);
+                    println!("{}", asm);
 
                     // Assemble the assembly code into bytecode
                     let bytecode = assemble(&asm);

@@ -2,12 +2,8 @@
 #![allow(dead_code, unused_variables)]
 
 use crate::ast::node::{BinOp, NodeType, UnOp};
-use crate::ast::tree::{Command, Node, ValueType};
-use crate::datatypes::datatype::DataType;
-use crate::tokens::{BaseType, TokenType};
-use anyhow::anyhow;
-use std::collections::HashMap;
-use std::error::Error;
+use crate::ast::tree::Node;
+use crate::tokens::TokenType;
 use std::fmt::{Display, Formatter};
 
 /// These are the instructions that the IR will have
@@ -110,7 +106,7 @@ impl IrGenerator {
             }
             NodeType::Text(value) => {
                 let loc = self.get_string_location(&*value);
-                self.push(format!("push {} ;", loc));
+                self.push(format!("spool {} ;", loc));
             }
             NodeType::Boolean(value) => {
                 self.push(format!("push {} ;", value));
@@ -136,7 +132,9 @@ impl IrGenerator {
                     BinOp::Pow => {
                         self.push(format!("pow ;"));
                     }
-
+                    BinOp::Assign => {
+                        //self.push(format!("set ;"));
+                    }
                     BinOp::And => {}
                     BinOp::Or => {}
                 }
@@ -171,7 +169,7 @@ impl IrGenerator {
                 if let Some(next_node) = node.children.get(0) {
                     // Generate the expression that gets assigned to the variable
                     self.generate_code(next_node);
-
+                    // Generate the storage command
                     self.push(format!("store {location} ;",));
                 }
             }
@@ -183,11 +181,32 @@ impl IrGenerator {
             }
             NodeType::Ident(name) => {
                 let index = self.get_variable(&name);
-                self.push(format!("load {index};"));
+                // Array element
+                if node.children.len() == 1 {
+                    self.generate_code(&node.children[0]);
+                    if node.can_assign {
+                        self.push(format!("astore {index};"));
+                    } else {
+                        self.push(format!("aload {index};"));
+                    }
+
+                    return;
+                }
+                if node.can_assign {
+                    self.push(format!("store {index};"));
+                } else {
+                    self.push(format!("load {index};"));
+                }
             }
             // We don't need to capture the internal elements here because we're drilling
             // down into the elements
-            NodeType::Array(_) => {}
+            NodeType::Array => {
+                for child in node.children.iter().rev() {
+                    self.generate_code(child);
+                }
+                let element_count = &node.children.len();
+                self.push(format!("newarray {element_count} ;"));
+            }
 
             NodeType::Root => {
                 for child in &node.children {

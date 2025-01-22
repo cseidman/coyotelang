@@ -1,13 +1,14 @@
 #![allow(dead_code)]
 
-use crate::heap::Heap;
+use crate::ctable::Table;
+use crate::heap::{Heap, HeapValue};
+use crate::valuetypes::DataTag::ConstText;
 use crate::{
     constants::Instruction,
     constants::Instruction::*,
     valuetypes::{DataTag, Object, Value},
 };
-use rand::{random, random_range};
-use std::{result, usize};
+use std::usize;
 
 pub struct Vm {
     stack: [Object; 64000],
@@ -33,6 +34,12 @@ impl Vm {
             string_pool: Vec::new(),
             ip: 0,
         }
+    }
+
+    fn get_tag(&mut self) -> DataTag {
+        let tag = DataTag::from(self.code[self.ip]);
+        self.ip += 1;
+        tag
     }
 
     fn get_instruction(&mut self) -> Instruction {
@@ -73,11 +80,8 @@ impl Vm {
 
     /// Gets the value that exists following the `const` instruction
     fn get_const(&mut self) -> Object {
-        // The const has already been consumed so the next byte tells us the type
-        let tag = DataTag::from(self.code[self.ip]);
-        self.ip += 1;
         Object {
-            tag,
+            tag: self.get_tag(),
             data: self.get_data(),
         }
     }
@@ -107,14 +111,10 @@ impl Vm {
     }
 
     pub fn run(&mut self) {
-        //println!("Loading constants");
         self.ip = 0;
         self.load_string_pool();
 
-        let globals = self.load_globals();
-        //println!("Globals: {globals}");
-
-        //println!("Executing code ..");
+        self.load_globals();
 
         macro_rules! binop {
             ($op:tt) => {
@@ -156,6 +156,17 @@ impl Vm {
                     self.push(obj);
                 }
 
+                SPool => {
+                    // Get the index in the string pool
+                    let pool_value = self.get_const();
+                    // Create an object with the same index but with the correct data type
+                    let obj = Object {
+                        tag: DataTag::ConstText,
+                        data: pool_value.data,
+                    };
+                    self.push(obj)
+                }
+
                 Add => {
                     binop!(+);
                 }
@@ -172,16 +183,68 @@ impl Vm {
                     binop!(/);
                 }
 
+                Set => {
+                    let slot = self.get_integer();
+                    self.stack[slot as usize] = self.pop();
+                }
+
                 Neg => {}
 
-                Newarray => {}
+                Newarray => {
+                    let element_count = self.get_integer();
+                    // Create the table as an array
+                    let mut arr = Table::<Object>::new();
+
+                    for _ in 0..element_count {
+                        let obj = self.pop();
+                        arr.push(obj)
+                    }
+
+                    let heap_index = self.heap.store(HeapValue::Table(arr));
+                    let value = Value { ptr: heap_index };
+
+                    let object = Object {
+                        tag: DataTag::Array,
+                        data: value,
+                    };
+                    self.push(object);
+                }
                 Store => {
                     let slot = self.get_integer();
                     self.stack[slot as usize] = self.pop();
                 }
+                AStore => {
+                    let index = self.pop().data.as_integer() as usize;
+                    let obj = self.pop();
+                    let ptr = self.get_integer();
+                    let heap = &mut self.heap.get_mut(ptr);
+                    // Get the table itself
+                    let Some(HeapValue::Table(ref mut table)) = heap else {
+                        return;
+                    };
+
+                    table.set(index, obj);
+                }
                 Load => {
                     let slot = self.get_integer();
                     let obj = self.stack[slot as usize];
+                    self.push(obj);
+                }
+                /// Get an element from an index
+                ALoad => {
+                    // Get the index
+                    let index = self.pop().data.as_integer() as usize;
+                    // Get the location of the table on the heap
+                    let ptr = self.get_integer();
+                    // Get the table itself
+                    let Some(HeapValue::Table(table)) = self.heap.get(ptr) else {
+                        return;
+                    };
+                    // Get the Object in the given location
+                    let Some(&obj) = table.get(index) else {
+                        eprintln!("no value located at index {}", index);
+                        return;
+                    };
                     self.push(obj);
                 }
                 Pop => {}
@@ -191,7 +254,6 @@ impl Vm {
                 }
 
                 Halt => {
-                    //println!("\n{}", self.pop());
                     break;
                 }
                 _ => {
@@ -211,7 +273,22 @@ impl Vm {
 
     fn print(&mut self) {
         let value = self.pop();
-        println!("{}", value);
+        match value.tag {
+            DataTag::ConstText => {
+                let index = value.data.as_text();
+                let text = &self.string_pool[index];
+                println!("{}", text);
+            }
+            DataTag::Array => {
+                let ptr = value.data.as_ptr();
+                if let Some(arr) = self.heap.get(ptr) {
+                    if let HeapValue::Table(table) = arr {
+                        println!("{}", table);
+                    }
+                }
+            }
+            _ => println!("{}", value),
+        }
     }
 }
 

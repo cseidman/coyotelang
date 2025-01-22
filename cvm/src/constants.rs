@@ -7,7 +7,7 @@ pub enum Instruction {
     Sub = 3,
     Mul = 4,
     Div = 5,
-    Equ = 6,
+    Set = 6,
     Store = 7,
     Pop = 8,
     Cmp = 9,
@@ -16,17 +16,20 @@ pub enum Instruction {
     Const = 12,
     Newarray = 13,
     Load = 14,
+    SPool = 15,
+    ALoad = 16,
+    AStore = 17,
 }
 
 impl Instruction {
-    pub const INSTRUCTIONS: [&'static str; 15] = [
+    pub const INSTRUCTIONS: [&'static str; 18] = [
         "halt",     // 0
         "push",     // 1
         "add",      // 2
         "sub",      // 3
         "mul",      // 4
         "div",      // 5
-        "equ",      // 6
+        "set",      // 6
         "store",    // 7
         "pop",      // 8
         "cmp",      // 9
@@ -35,6 +38,9 @@ impl Instruction {
         "const",    // 12
         "newarray", // 13
         "load",     // 14
+        "spush",    // 15
+        "aload",    // 16
+        "astore",   // 17
     ];
 
     /// Return the human-readable name of this instruction.
@@ -51,7 +57,7 @@ impl Instruction {
             3 => Instruction::Sub,
             4 => Instruction::Mul,
             5 => Instruction::Div,
-            6 => Instruction::Equ,
+            6 => Instruction::Set,
             7 => Instruction::Store,
             8 => Instruction::Pop,
             9 => Instruction::Cmp,
@@ -60,6 +66,9 @@ impl Instruction {
             12 => Instruction::Const,
             13 => Instruction::Newarray,
             14 => Instruction::Load,
+            15 => Instruction::SPool,
+            16 => Instruction::ALoad,
+            17 => Instruction::AStore,
             _ => {
                 panic!("Unknown opcode {}", opcode);
             }
@@ -74,7 +83,7 @@ impl Instruction {
             "sub" => Some(Instruction::Sub),
             "mul" => Some(Instruction::Mul),
             "div" => Some(Instruction::Div),
-            "equ" => Some(Instruction::Equ),
+            "set" => Some(Instruction::Set),
             "store" => Some(Instruction::Store),
             "pop" => Some(Instruction::Pop),
             "cmp" => Some(Instruction::Cmp),
@@ -83,6 +92,9 @@ impl Instruction {
             "const" => Some(Instruction::Const),
             "newarray" => Some(Instruction::Newarray),
             "load" => Some(Instruction::Load),
+            "spool" => Some(Instruction::SPool),
+            "aload" => Some(Instruction::ALoad),
+            "astore" => Some(Instruction::AStore),
             _ => None,
         }
     }

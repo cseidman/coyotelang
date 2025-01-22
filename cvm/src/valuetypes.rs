@@ -2,7 +2,6 @@
 
 use std::cmp::PartialEq;
 use std::fmt::{Display, Formatter};
-use std::ops::{Add, Mul};
 
 #[repr(u8)]
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -15,6 +14,9 @@ pub enum DataTag {
     Integer = 5,
     Byte = 6,
     UInt = 7,
+    Text = 8,
+    ConstText = 9,
+    Array = 10,
 }
 
 impl From<u8> for DataTag {
@@ -28,6 +30,9 @@ impl From<u8> for DataTag {
             5 => DataTag::Integer,
             6 => DataTag::Byte,
             7 => DataTag::UInt,
+            8 => DataTag::Text,
+            9 => DataTag::ConstText,
+            10 => DataTag::Array,
             _ => {
                 panic!("unknown tag")
             }
@@ -68,6 +73,15 @@ impl Display for Object {
             DataTag::UInt => {
                 write!(f, "{}", self.data.as_uint())
             }
+            DataTag::Text => {
+                write!(f, "{}", self.data.as_text())
+            }
+            DataTag::ConstText => {
+                write!(f, "{}", self.data.as_text())
+            }
+            DataTag::Array => {
+                write!(f, "{}", self.data.as_text())
+            }
         }
     }
 }
@@ -77,7 +91,7 @@ pub union Value {
     pub i: i64,
     pub f: f64,
     pub b: bool,
-    pub ptr: *const u8,
+    pub ptr: usize,
     pub bytes: [u8; 8],
     pub uint: usize,
     pub byte: u8,
@@ -98,30 +112,18 @@ impl Value {
         unsafe { self.b }
     }
 
-    pub fn as_ptr(&self) -> *const u8 {
+    pub fn as_ptr(&self) -> usize {
         unsafe { self.ptr }
     }
 
     pub fn as_uint(&self) -> usize {
-        unsafe { self.uint }
+        self.as_float() as usize
     }
 
     pub fn as_byte(&self) -> u8 {
         unsafe { self.byte }
     }
-}
-
-#[repr(C)]
-pub struct Array {
-    pub data_type: u8,
-    pub data: Vec<Value>,
-}
-
-impl Array {
-    pub fn new(data_type: u8, size: usize) -> Self {
-        Self {
-            data_type,
-            data: Vec::with_capacity(size),
-        }
+    pub fn as_text(&self) -> usize {
+        self.as_uint()
     }
 }

@@ -162,9 +162,8 @@ impl Parser {
         while let Some(token) = self.peek() {
             match token.token_type {
                 TokenType::Let => {
-                    if let Ok(n) = self.parse_let() {
-                        node.add_child(n);
-                    }
+                    let n = self.parse_let()?;
+                    node.add_child(n);
                 }
                 TokenType::Print => {
                     self.advance();
@@ -179,11 +178,8 @@ impl Parser {
                     continue;
                 }
                 _ => {
-                    if let Ok(n) = self.parse_expr(0) {
-                        node.add_child(n);
-                    } else {
-                        bail!("Unexpected token {:?}", token.token_type);
-                    }
+                    let n = self.parse_expr(0)?;
+                    node.add_child(n);
                 }
             };
             self.advance();
@@ -245,7 +241,15 @@ impl Parser {
                     panic!("Variable '{}' does not exist in this scope", name);
                 }
                 let varname = Box::new(name.to_string());
-                let node = Node::new(Ident(varname), self.current_token());
+                let mut node = Node::new(Ident(varname), self.current_token());
+                // Check if this is an array
+                if self.match_token(TokenType::LBracket) {
+                    if let Ok(index) = self.parse_expr(0) {
+                        node.add_child(index);
+                    }
+                    self.expect_token(RBracket)?;
+                }
+
                 Ok(node)
             }
             TokenType::LParen => {
@@ -253,6 +257,16 @@ impl Parser {
                 let expr = self.parse_expr(0)?;
                 self.expect_token(TokenType::RParen)?;
                 Ok(expr)
+            }
+            TokenType::LBracket => {
+                self.advance();
+                let mut node = Node::new(NodeType::Array, self.current_token());
+                while !self.match_token(TokenType::RBracket) {
+                    let expr = self.parse_expr(0)?;
+                    self.match_token(TokenType::Comma);
+                    node.add_child(expr);
+                }
+                Ok(node)
             }
             // Unary operators
             TokenType::Plus => {
@@ -294,6 +308,10 @@ impl Parser {
                 Caret => {
                     is_right_associative = true;
                     (30, BinOp::Pow)
+                }
+                Assign => {
+                    node.can_assign = true;
+                    (50, BinOp::Assign)
                 }
                 _ => break, // no operator, stop
             };

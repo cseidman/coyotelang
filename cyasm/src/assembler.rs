@@ -2,7 +2,7 @@
 use cvm::constants::*;
 use cvm::valuetypes::DataTag;
 use std::iter::Peekable;
-use std::str::{Chars, FromStr};
+use std::str::Chars;
 
 struct AsmParser<'a> {
     asm: Peekable<Chars<'a>>,
