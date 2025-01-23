@@ -1,8 +1,10 @@
 #![allow(dead_code)]
 
+const STACK_SIZE: usize = 1_000_000;
+const GLOBAL_SIZE: usize = 1024;
+
 use crate::ctable::Table;
 use crate::heap::{Heap, HeapValue};
-use crate::valuetypes::DataTag::ConstText;
 use crate::{
     constants::Instruction,
     constants::Instruction::*,
@@ -10,13 +12,27 @@ use crate::{
 };
 use std::usize;
 
+struct StackFrame {
+    ip: usize,
+    sp: usize,
+}
+
+impl StackFrame {
+    pub fn new(ip: usize, sp: usize) -> Self {
+        Self { ip, sp }
+    }
+}
+
 pub struct Vm {
-    stack: [Object; 64000],
+    stack: Vec<Object>,
     sp: usize,
     heap: Heap,
     pub code: Vec<u8>,
     string_pool: Vec<String>,
     ip: usize,
+
+    stack_frame: Vec<StackFrame>,
+    fp: usize,
 }
 
 impl Vm {
@@ -27,12 +43,15 @@ impl Vm {
         };
 
         Self {
-            stack: [obj; 64000],
-            sp: 16,
+            stack: vec![obj; STACK_SIZE],
+            sp: GLOBAL_SIZE,
             code: Vec::new(),
             heap: Heap::new(),
             string_pool: Vec::new(),
             ip: 0,
+
+            stack_frame: vec![],
+            fp: 0,
         }
     }
 
@@ -42,14 +61,32 @@ impl Vm {
         tag
     }
 
+    fn push_frame(&mut self) {
+        let frame = StackFrame::new(self.ip, self.sp);
+        self.stack_frame.push(frame);
+        self.ip = 0;
+        self.sp += 1;
+        self.fp += 1;
+    }
+
+    fn pop_frame(&mut self) {
+        if let Some(frame) = self.stack_frame.pop() {
+            self.ip = frame.ip;
+            self.sp = frame.sp;
+            self.sp -= 1;
+        }
+    }
+
     fn get_instruction(&mut self) -> Instruction {
-        let byte = self.code[self.ip];
+        let ip = self.ip;
+        let byte = self.code[ip];
         self.ip += 1;
         Instruction::from_u8(byte)
     }
 
     fn get_data(&mut self) -> Value {
-        let bytes: [u8; 8] = self.code[self.ip..self.ip + 8].try_into().unwrap();
+        let ip = self.ip;
+        let bytes: [u8; 8] = self.code[ip..ip + 8].try_into().unwrap();
         self.ip += 8;
         Value { bytes }
     }
@@ -230,7 +267,7 @@ impl Vm {
                     let obj = self.stack[slot as usize];
                     self.push(obj);
                 }
-                /// Get an element from an index
+                // Get an element from an index
                 ALoad => {
                     // Get the index
                     let index = self.pop().data.as_integer() as usize;
@@ -296,15 +333,4 @@ pub fn execute(bytecode: Vec<u8>) {
     let mut vm = Vm::new();
     vm.code = bytecode;
     vm.run();
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::vm::Vm;
-    #[test]
-    fn test_vm() {}
-
-    #[test]
-    fn test_vm_let() {}
 }

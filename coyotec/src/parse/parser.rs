@@ -16,7 +16,6 @@ use std::slice::Iter;
 use crate::ast::node::NodeType::*;
 use crate::ast::node::UnOp::Neg;
 use crate::ast::node::{BinOp, Node, NodeType, UnOp};
-use crate::symbols::{SymbolTable, Symbols};
 use crate::tokens::{BaseType::*, TokenType::*};
 use crate::{tokens, Deferable};
 
@@ -26,8 +25,7 @@ const CURRENT: usize = 1;
 pub struct Parser {
     pub source_code: String,
     pub tokens: Vec<Token>,
-    current: usize,            // The current token position being parsed
-    symbol_table: SymbolTable, // A map of symbol names to location numbers
+    current: usize, // The current token position being parsed
     has_error: bool,
 }
 
@@ -38,26 +36,8 @@ impl Parser {
             tokens,
             source_code,
             current: 0,
-            symbol_table: SymbolTable::new(),
             has_error: false,
         }
-    }
-
-    /// Register new variable in the symbol table
-    fn register_variable(&mut self, variable_name: &str, data_type: DataType) {
-        self.symbol_table.add_symbol(variable_name, data_type);
-    }
-
-    fn variable_exists(&mut self, variable_name: &str) -> bool {
-        self.symbol_table.get(variable_name).is_some()
-    }
-
-    fn push_scope(&mut self) {
-        self.symbol_table.push_scope();
-    }
-
-    fn pop_scope(&mut self) {
-        self.symbol_table.pop_scope();
     }
 
     fn current_token(&self) -> Option<Token> {
@@ -141,9 +121,6 @@ impl Parser {
     fn new_identifier(&mut self) -> Result<Node> {
         if let Some(token) = self.peek() {
             let node = if let TokenType::Identifier(name) = token.token_type {
-                // Register the new variable in the symbol table
-                self.register_variable(&name, DataType::None);
-
                 // Create the identifier node
                 Node::new(NodeType::Ident(Box::from(name)), self.current_token())
             } else {
@@ -173,10 +150,24 @@ impl Parser {
                     node.add_child(print_node);
                 }
 
-                TokenType::Newline => {
+                Newline | EOF => {
                     self.advance();
                     continue;
                 }
+                LBrace => {
+                    self.advance();
+                    let n = Node::new(NodeType::Block, self.current_token());
+                    node.add_child(n);
+                    continue;
+                }
+
+                RBrace => {
+                    self.advance();
+                    let n = Node::new(NodeType::EndBlock, self.current_token());
+                    node.add_child(n);
+                    continue;
+                }
+
                 _ => {
                     let n = self.parse_expr(0)?;
                     node.add_child(n);
@@ -236,10 +227,7 @@ impl Parser {
             }
             TokenType::Identifier(name) => {
                 self.advance();
-                // Check if the value is in the symbol table
-                if !self.variable_exists(&name) {
-                    panic!("Variable '{}' does not exist in this scope", name);
-                }
+
                 let varname = Box::new(name.to_string());
                 let mut node = Node::new(Ident(varname), self.current_token());
                 // Check if this is an array
@@ -252,13 +240,13 @@ impl Parser {
 
                 Ok(node)
             }
-            TokenType::LParen => {
+            LParen => {
                 self.advance();
                 let expr = self.parse_expr(0)?;
                 self.expect_token(TokenType::RParen)?;
                 Ok(expr)
             }
-            TokenType::LBracket => {
+            LBracket => {
                 self.advance();
                 let mut node = Node::new(NodeType::Array, self.current_token());
                 while !self.match_token(TokenType::RBracket) {
@@ -268,6 +256,7 @@ impl Parser {
                 }
                 Ok(node)
             }
+
             // Unary operators
             TokenType::Plus => {
                 self.advance();

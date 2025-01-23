@@ -8,7 +8,6 @@ mod debug;
 mod errors;
 pub mod generator;
 pub mod parse;
-mod symbols;
 
 pub struct Deferable<F: FnOnce()>(Option<F>);
 impl<F: FnOnce()> Deferable<F> {

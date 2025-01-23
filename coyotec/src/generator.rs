@@ -9,13 +9,33 @@ use std::fmt::{Display, Formatter};
 /// These are the instructions that the IR will have
 /// The IR will be in SSA form
 
+struct Symbols {
+    list: Vec<String>,
+    location: usize,
+}
+impl Symbols {
+    fn new(location: usize) -> Self {
+        Self {
+            list: vec![],
+            location,
+        }
+    }
+
+    fn register_symbol(&mut self, symbol: String) -> usize {
+        let loc = self.location;
+        self.location += 1;
+        self.list.push(symbol);
+        loc
+    }
+}
+
 pub struct IrGenerator {
     instructions: Vec<String>,
     string_pool: Vec<String>,
     strings_index: usize,
 
     scope: usize,
-    symbol_loc: Vec<String>,
+    symbol_loc: Vec<Symbols>,
 }
 
 pub fn generate(node: &Node) -> String {
@@ -49,7 +69,7 @@ impl IrGenerator {
             string_pool: Vec::new(),
             strings_index: 0,
             scope: 0,
-            symbol_loc: vec![],
+            symbol_loc: vec![Symbols::new(0)],
         }
     }
 
@@ -73,16 +93,29 @@ impl IrGenerator {
     }
 
     fn store_variable(&mut self, name: &str) -> usize {
-        let loc = self.symbol_loc.len();
-        self.symbol_loc.push(name.to_string());
-        loc
+        let scope = self.scope;
+        self.symbol_loc[scope].register_symbol(name.to_string())
     }
 
     fn get_variable(&mut self, name: &str) -> usize {
-        if let Some(index) = self.symbol_loc.iter().position(|x| x == name) {
-            return index;
+        let scope = self.scope;
+        let location = self.symbol_loc[scope].location;
+        if let Some(index) = self.symbol_loc[scope].list.iter().position(|x| x == name) {
+            return index + location - 1;
         }
         panic!("Variable '{name}' not found in symbol loc");
+    }
+
+    fn push_scope(&mut self) {
+        let scope = self.scope;
+        let location = self.symbol_loc[scope].location;
+        self.scope += 1;
+        self.symbol_loc.push(Symbols::new(location));
+    }
+
+    fn pop_scope(&mut self) {
+        self.scope -= 1;
+        self.symbol_loc.pop();
     }
 
     fn push(&mut self, instruction: String) {
@@ -110,6 +143,14 @@ impl IrGenerator {
             }
             NodeType::Boolean(value) => {
                 self.push(format!("push {} ;", value));
+            }
+
+            NodeType::Block => {
+                self.push_scope();
+            }
+
+            NodeType::EndBlock => {
+                self.pop_scope();
             }
 
             NodeType::BinaryOp(op) => {

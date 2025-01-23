@@ -59,6 +59,8 @@ pub enum NodeType {
     // Statements
     Let,
     Print,
+    Block,
+    EndBlock,
 }
 
 impl Display for NodeType {
@@ -86,6 +88,8 @@ impl Display for NodeType {
             NodeType::Assignment => write!(f, "assignment"),
             NodeType::Let => write!(f, "let"),
             NodeType::Print => write!(f, "print"),
+            NodeType::Block => write!(f, "block"),
+            NodeType::EndBlock => write!(f, "endblock"),
         }
     }
 }
