@@ -17,7 +17,7 @@ pub fn compile(code: &str, source_type: SourceType) -> Result<Vec<u8>> {
     if let Ok(node) = parse(tokens, code.to_string()) {
         // Generate the assembly code
         let asm = generate(&node);
-        //println!("{}", asm);
+        println!("{}", asm);
         // Assemble the assembly code into bytecode
         bytecode = assemble(&asm);
         //println!("Bytecode: {:?}", bytecode);

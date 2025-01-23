@@ -123,6 +123,18 @@ impl<'a> AsmParser<'a> {
                 continue;
             }
 
+            if c == '#' {
+                loop {
+                    if let Some(c) = self.advance() {
+                        if c == '\n' {
+                            self.line += 1;
+                            break;
+                        }
+                    }
+                }
+                continue;
+            }
+
             if c == '"' {
                 let mut str_val = String::new();
                 self.advance();

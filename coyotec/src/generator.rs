@@ -11,21 +11,20 @@ use std::fmt::{Display, Formatter};
 
 struct Symbols {
     list: Vec<String>,
-    location: usize,
+    syp: usize,
 }
 impl Symbols {
-    fn new(location: usize) -> Self {
+    fn new() -> Self {
         Self {
             list: vec![],
-            location,
+            syp: 0,
         }
     }
 
     fn register_symbol(&mut self, symbol: String) -> usize {
-        let loc = self.location;
-        self.location += 1;
-        self.list.push(symbol);
-        loc
+        self.list.push(symbol.clone());
+        self.syp += 1;
+        self.syp - 1
     }
 }
 
@@ -35,6 +34,7 @@ pub struct IrGenerator {
     strings_index: usize,
 
     scope: usize,
+    offset: usize,
     symbol_loc: Vec<Symbols>,
 }
 
@@ -69,7 +69,8 @@ impl IrGenerator {
             string_pool: Vec::new(),
             strings_index: 0,
             scope: 0,
-            symbol_loc: vec![Symbols::new(0)],
+            offset: 0,
+            symbol_loc: vec![Symbols::new()],
         }
     }
 
@@ -94,28 +95,47 @@ impl IrGenerator {
 
     fn store_variable(&mut self, name: &str) -> usize {
         let scope = self.scope;
-        self.symbol_loc[scope].register_symbol(name.to_string())
+        self.symbol_loc[scope].register_symbol(name.to_string()) + self.offset
+    }
+
+    fn get_global(&mut self, name: &str) -> Option<usize> {
+        if let Some(index) = self.symbol_loc[0].list.iter().position(|x| x == name) {
+            return Some(index);
+        }
+        None
     }
 
     fn get_variable(&mut self, name: &str) -> usize {
         let scope = self.scope;
-        let location = self.symbol_loc[scope].location;
+        let location = self.offset;
         if let Some(index) = self.symbol_loc[scope].list.iter().position(|x| x == name) {
-            return index + location - 1;
+            return index + location;
         }
+        // The variable was not found, so we check in the global space (scope 0)
+        if let Some(index) = self.get_global(name) {
+            return index;
+        }
+
         panic!("Variable '{name}' not found in symbol loc");
     }
 
     fn push_scope(&mut self) {
         let scope = self.scope;
-        let location = self.symbol_loc[scope].location;
+        let offset = self.symbol_loc[scope].syp;
         self.scope += 1;
-        self.symbol_loc.push(Symbols::new(location));
+        self.symbol_loc.push(Symbols::new());
+        self.offset += offset;
+        self.push(format!("# push scope : offset={}", self.offset));
     }
 
     fn pop_scope(&mut self) {
         self.scope -= 1;
+
         self.symbol_loc.pop();
+        // Return the offset back to where it was
+        let scope = self.scope;
+        self.offset -= self.symbol_loc[scope].syp;
+        self.push(format!("# pop scope : offset={}", self.offset));
     }
 
     fn push(&mut self, instruction: String) {
@@ -211,7 +231,7 @@ impl IrGenerator {
                     // Generate the expression that gets assigned to the variable
                     self.generate_code(next_node);
                     // Generate the storage command
-                    self.push(format!("store {location} ;",));
+                    self.push(format!("store {location} ; # name={var_name}",));
                 }
             }
             NodeType::Print => {
@@ -234,9 +254,9 @@ impl IrGenerator {
                     return;
                 }
                 if node.can_assign {
-                    self.push(format!("store {index};"));
+                    self.push(format!("store {index}; # name = {name}"));
                 } else {
-                    self.push(format!("load {index};"));
+                    self.push(format!("load {index}; # name = {name}"));
                 }
             }
             // We don't need to capture the internal elements here because we're drilling
