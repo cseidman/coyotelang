@@ -167,7 +167,33 @@ impl Parser {
                     node.add_child(n);
                     continue;
                 }
+                TokenType::If => {
+                    self.advance();
+                    println!("Starting if");
+                    let mut if_node = Node::new(NodeType::If, self.current_token());
 
+                    let condition = self.parse_expr(0)?;
+                    println!("Made condition: {:?}", condition);
+                    if_node.add_child(condition);
+                    let statements = self.parse();
+
+                    while self.match_token(TokenType::ElseIf) {
+                        let mut elseif_node = Node::new(NodeType::ElseIf, self.current_token());
+                        let condition = self.parse_expr(0)?;
+                        elseif_node.add_child(condition);
+                        if_node.add_child(elseif_node);
+                    }
+
+                    if self.match_token(TokenType::Else) {
+                        let else_node = Node::new(NodeType::Else, self.current_token());
+                        if_node.add_child(else_node);
+                    }
+
+                    self.expect_token(TokenType::EndIf)?;
+                    let else_node = Node::new(NodeType::EndIf, self.current_token());
+                    if_node.add_child(else_node);
+                    node.add_child(if_node);
+                }
                 _ => {
                     let n = self.parse_expr(0)?;
                     node.add_child(n);
@@ -290,18 +316,28 @@ impl Parser {
             let token_type = token.clone().token_type;
 
             let (prec, op) = match token_type {
-                Plus => (10, BinOp::Add),
-                Minus => (10, BinOp::Sub),
-                Star => (20, BinOp::Mul),
-                Slash => (20, BinOp::Div),
+                Plus => (30, BinOp::Add),
+                Minus => (30, BinOp::Sub),
+                Star => (40, BinOp::Mul),
+                Slash => (40, BinOp::Div),
                 Caret => {
                     is_right_associative = true;
-                    (30, BinOp::Pow)
+                    (50, BinOp::Pow)
                 }
+                GreaterThan => (20, BinOp::GreaterThan),
+                LessThan => (20, BinOp::LessThan),
+                EqualGreaterThan => (20, BinOp::GreaterThanEqual),
+                EqualLessThan => (20, BinOp::LessThanEqual),
+                EqualEqual => (20, BinOp::EqualEqual),
+                NotEqual => (20, BinOp::NotEqual),
+                And => (10, BinOp::And),
+                Or => (10, BinOp::Or),
+
                 Assign => {
                     node.can_assign = true;
-                    (50, BinOp::Assign)
+                    (60, BinOp::Assign)
                 }
+
                 _ => break, // no operator, stop
             };
 

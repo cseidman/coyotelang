@@ -64,7 +64,8 @@ pub enum TokenType {
     Comma,
     SemiColon,
     Colon,
-    Equal,
+    EqualEqual,
+    NotEqual,
     Assign,
     Plus,
     Minus,
@@ -73,6 +74,8 @@ pub enum TokenType {
     Percent,
     LessThan,
     GreaterThan,
+    EqualLessThan,
+    EqualGreaterThan,
     Ampersand,
     Pipe,
     Caret,
@@ -88,6 +91,13 @@ pub enum TokenType {
     Func,
     Print,
     EOF,
+    If,
+    Else,
+    ElseIf,
+    EndIf,
+    Not,
+    And,
+    Or,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct Location {

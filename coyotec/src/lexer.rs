@@ -173,8 +173,9 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
                 "let" => lexer.make_token(TokenType::Let),
                 "func" => lexer.make_token(TokenType::Func),
                 "print" => lexer.make_token(TokenType::Print),
-                // Datatypes
-                "int" => lexer.make_token(TokenType::DataType(BaseType::Integer)),
+                // Keywords
+                "and" => lexer.make_token(TokenType::And),
+                "or" => lexer.make_token(TokenType::Or),
                 // And if all else fails: identifier
                 _ => lexer.make_token(TokenType::Identifier(ident)),
             };
@@ -189,7 +190,14 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
             ']' => TokenType::RBracket,
             '(' => TokenType::LParen,
             ')' => TokenType::RParen,
-            '!' => TokenType::Bang,
+            '!' => {
+                if *lexer.peek().unwrap_or(&'\0') == '=' {
+                    lexer.advance();
+                    TokenType::NotEqual
+                } else {
+                    TokenType::Bang
+                }
+            }
             '{' => TokenType::LBrace,
             '}' => TokenType::RBrace,
             '.' => TokenType::Dot,
@@ -197,11 +205,21 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
             ';' => TokenType::SemiColon,
             ':' => TokenType::Colon,
             '=' => {
-                if *lexer.peek().unwrap_or(&'\0') == '=' {
-                    lexer.advance();
-                    TokenType::Equal
-                } else {
-                    TokenType::Assign
+                let chr = *lexer.peek().unwrap_or(&'\0');
+                match chr {
+                    '=' => {
+                        lexer.advance();
+                        TokenType::EqualEqual
+                    }
+                    '>' => {
+                        lexer.advance();
+                        TokenType::EqualGreaterThan
+                    }
+                    '<' => {
+                        lexer.advance();
+                        TokenType::EqualLessThan
+                    }
+                    _ => TokenType::Assign,
                 }
             }
             '+' => TokenType::Plus,
@@ -226,10 +244,38 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
                 TokenType::Slash
             }
             '%' => TokenType::Percent,
-            '<' => TokenType::LessThan,
-            '>' => TokenType::GreaterThan,
-            '&' => TokenType::Ampersand,
-            '|' => TokenType::Pipe,
+            '<' => {
+                if *lexer.peek().unwrap_or(&'\0') == '=' {
+                    lexer.advance();
+                    TokenType::EqualLessThan
+                } else {
+                    TokenType::LessThan
+                }
+            }
+            '>' => {
+                if *lexer.peek().unwrap_or(&'\0') == '=' {
+                    lexer.advance();
+                    TokenType::EqualGreaterThan
+                } else {
+                    TokenType::GreaterThan
+                }
+            }
+            '&' => {
+                if *lexer.peek().unwrap_or(&'\0') == '&' {
+                    lexer.advance();
+                    TokenType::And
+                } else {
+                    TokenType::Ampersand
+                }
+            }
+            '|' => {
+                if *lexer.peek().unwrap_or(&'\0') == '|' {
+                    lexer.advance();
+                    TokenType::Or
+                } else {
+                    TokenType::Pipe
+                }
+            }
             '^' => TokenType::Caret,
             '#' => TokenType::Hash,
             '@' => TokenType::At,

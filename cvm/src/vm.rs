@@ -10,6 +10,7 @@ use crate::{
     constants::Instruction::*,
     valuetypes::{DataTag, Object, Value},
 };
+use std::ops::Neg;
 use std::usize;
 
 struct StackFrame {
@@ -155,30 +156,32 @@ impl Vm {
 
         macro_rules! binop {
             ($op:tt) => {
-
                 let left = self.pop();
                 let right = self.pop();
+                let obj = left $op right;
 
-                let left_tag = left.tag;
-                let right_tag = right.tag;
+                self.push(obj);
+            };
 
-                let ldata = left.data.as_float();
-                let rdata = right.data.as_float();
+        }
 
-                let result_value:f64 = ldata $op rdata;
+        macro_rules! cmpop {
+            ($op:tt) => {
+                let left = self.pop();
+                let right = self.pop();
+                let val = left $op right;
 
-                let result_tag = match (left_tag, right_tag) {
-                    (DataTag::Integer, DataTag::Integer) => DataTag::Integer,
-                    (DataTag::Float, _) | (_, DataTag::Float) => DataTag::Float,
-                    _ => panic!("Tag combination {:?} and {:?} are not allowed", left_tag, right_tag),
-                };
+                self.push(Object::new(DataTag::Bool, Value { b: val }));
+            };
 
-                let result = Object {
-                    tag: result_tag,
-                    data: Value { f: result_value },
-                };
+        }
 
-                self.push(result);
+        macro_rules! boolop {
+            ($op:tt) => {
+                let right = self.pop();
+                let left = self.pop();
+                let val = left.data.as_bool() $op right.data.as_bool();
+                self.push(Object::new(DataTag::Bool, Value { b: val }));
             };
         }
 
@@ -220,12 +223,39 @@ impl Vm {
                     binop!(/);
                 }
 
+                Eq => {
+                    cmpop!(==);
+                }
+
+                Neq => {
+                    cmpop!(!=);
+                }
+
+                Gt => {
+                    cmpop!(>);
+                }
+
+                Ge => {
+                    cmpop!(>=);
+                }
+
+                Lt => {
+                    cmpop!(<);
+                }
+
+                Le => {
+                    cmpop!(<=);
+                }
+
                 Set => {
                     let slot = self.get_integer();
                     self.stack[slot as usize] = self.pop();
                 }
 
-                Neg => {}
+                Neg => {
+                    let obj = self.pop();
+                    self.push(obj.neg());
+                }
 
                 Newarray => {
                     let element_count = self.get_integer();
@@ -248,20 +278,14 @@ impl Vm {
                 }
                 Store => {
                     let slot = self.get_integer();
-                    self.stack[slot as usize] = self.pop();
-                }
-                AStore => {
-                    let index = self.pop().data.as_integer() as usize;
                     let obj = self.pop();
-                    let ptr = self.get_integer();
-                    let heap = &mut self.heap.get_mut(ptr);
-                    // Get the table itself
-                    let Some(HeapValue::Table(ref mut table)) = heap else {
-                        return;
-                    };
-
-                    table.set(index, obj);
+                    match obj.tag {
+                        _ => {
+                            self.stack[slot as usize] = obj;
+                        }
+                    }
                 }
+
                 Load => {
                     let slot = self.get_integer();
                     let obj = self.stack[slot as usize];
@@ -271,20 +295,30 @@ impl Vm {
                 ALoad => {
                     // Get the index
                     let index = self.pop().data.as_integer() as usize;
-                    // Get the location of the table on the heap
-                    let ptr = self.get_integer();
+                    // Get the array pointer
+                    let slot = self.get_integer();
+                    let obj = self.stack[slot as usize];
+                    let ptr = obj.data.as_integer() as usize;
                     // Get the table itself
                     let Some(HeapValue::Table(table)) = self.heap.get(ptr) else {
+                        eprintln!("no array located at {}", ptr);
                         return;
                     };
+
                     // Get the Object in the given location
                     let Some(&obj) = table.get(index) else {
                         eprintln!("no value located at index {}", index);
                         return;
                     };
+
                     self.push(obj);
                 }
-                Pop => {}
+                And => {
+                    boolop!(&&);
+                }
+                Or => {
+                    boolop!(||);
+                }
 
                 Print => {
                     self.print();

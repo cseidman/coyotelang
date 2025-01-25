@@ -196,8 +196,30 @@ impl IrGenerator {
                     BinOp::Assign => {
                         //self.push(format!("set ;"));
                     }
-                    BinOp::And => {}
-                    BinOp::Or => {}
+                    BinOp::And => {
+                        self.push(format!("and ;"));
+                    }
+                    BinOp::Or => {
+                        self.push(format!("or ;"));
+                    }
+                    BinOp::GreaterThanEqual => {
+                        self.push(format!("ge ;"));
+                    }
+                    BinOp::GreaterThan => {
+                        self.push(format!("gt ;"));
+                    }
+                    BinOp::LessThanEqual => {
+                        self.push(format!("le ;"));
+                    }
+                    BinOp::LessThan => {
+                        self.push(format!("lt ;"));
+                    }
+                    BinOp::EqualEqual => {
+                        self.push(format!("eq ;"));
+                    }
+                    BinOp::NotEqual => {
+                        self.push(format!("neq ;"));
+                    }
                 }
             }
             NodeType::UnaryOp(op) => {
@@ -246,7 +268,7 @@ impl IrGenerator {
                 if node.children.len() == 1 {
                     self.generate_code(&node.children[0]);
                     if node.can_assign {
-                        self.push(format!("astore {index};"));
+                        self.push(format!("store {index};"));
                     } else {
                         self.push(format!("aload {index};"));
                     }

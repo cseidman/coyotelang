@@ -12,8 +12,13 @@ pub enum BinOp {
     And,
     Or,
     Assign,
+    EqualEqual,
+    NotEqual,
+    GreaterThan,
+    GreaterThanEqual,
+    LessThan,
+    LessThanEqual,
 }
-
 impl Display for BinOp {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -25,6 +30,12 @@ impl Display for BinOp {
             BinOp::And => write!(f, "and"),
             BinOp::Or => write!(f, "or"),
             BinOp::Assign => write!(f, "or"),
+            BinOp::EqualEqual => write!(f, "=="),
+            BinOp::NotEqual => write!(f, "!="),
+            BinOp::GreaterThan => write!(f, ">"),
+            BinOp::GreaterThanEqual => write!(f, ">="),
+            BinOp::LessThan => write!(f, "<"),
+            BinOp::LessThanEqual => write!(f, "<="),
         }
     }
 }
@@ -56,6 +67,11 @@ pub enum NodeType {
     BinaryOp(BinOp),
     Function(Box<Vec<NodeType>>),
     Assignment,
+    // IF can be an expression as well
+    If,
+    Else,
+    ElseIf,
+    EndIf,
     // Statements
     Let,
     Print,
@@ -84,12 +100,24 @@ impl Display for NodeType {
             NodeType::BinaryOp(BinOp::And) => write!(f, "and"),
             NodeType::BinaryOp(BinOp::Or) => write!(f, "or"),
             NodeType::BinaryOp(BinOp::Assign) => write!(f, "assign"),
+
+            NodeType::BinaryOp(BinOp::GreaterThan) => write!(f, "gt"),
+            NodeType::BinaryOp(BinOp::GreaterThanEqual) => write!(f, "ge"),
+            NodeType::BinaryOp(BinOp::LessThan) => write!(f, "lt"),
+            NodeType::BinaryOp(BinOp::LessThanEqual) => write!(f, "le"),
+            NodeType::BinaryOp(BinOp::EqualEqual) => write!(f, "eq"),
+            NodeType::BinaryOp(BinOp::NotEqual) => write!(f, "neq"),
+
             NodeType::Function(_) => write!(f, "function"),
             NodeType::Assignment => write!(f, "assignment"),
             NodeType::Let => write!(f, "let"),
             NodeType::Print => write!(f, "print"),
             NodeType::Block => write!(f, "block"),
             NodeType::EndBlock => write!(f, "endblock"),
+            NodeType::If => write!(f, "if"),
+            NodeType::Else => write!(f, "else"),
+            NodeType::ElseIf => write!(f, "elseif"),
+            NodeType::EndIf => write!(f, "endif"),
         }
     }
 }

@@ -111,7 +111,7 @@ fn repl<'a>() -> Result<()> {
                     // Generate the assembly code
                     generator.generate(&node);
                     let asm = format!("{}", generator);
-                    //println!("{}", asm);
+                    println!("{}", asm);
 
                     // Assemble the assembly code into bytecode
                     let bytecode = assemble(&asm);

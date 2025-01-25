@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 
-use std::cmp::PartialEq;
+use std::cmp::{Ordering, PartialEq};
 use std::fmt::{Display, Formatter};
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 #[repr(u8)]
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -44,6 +45,185 @@ impl From<u8> for DataTag {
 pub struct Object {
     pub tag: DataTag,
     pub data: Value,
+}
+
+impl Object {
+    pub fn new(tag: DataTag, data: Value) -> Object {
+        Object { tag, data }
+    }
+}
+
+impl PartialOrd for Object {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self.tag, other.tag) {
+            (DataTag::Nil, DataTag::Nil) => Some(Ordering::Equal),
+            (DataTag::Integer, DataTag::Integer) | (DataTag::Float, _) | (_, DataTag::Float) => {
+                self.data.as_float().partial_cmp(&other.data.as_float())
+            }
+            _ => panic!("cannot compare values of non-numeric objects"),
+        }
+    }
+
+    fn lt(&self, other: &Self) -> bool {
+        match (self.tag, other.tag) {
+            (DataTag::Nil, DataTag::Nil) => false,
+            (DataTag::Integer, DataTag::Integer) | (DataTag::Float, _) | (_, DataTag::Float) => {
+                self.data.as_float() < other.data.as_float()
+            }
+            _ => panic!("cannot compare values of non-numeric objects"),
+        }
+    }
+
+    fn le(&self, other: &Self) -> bool {
+        match (self.tag, other.tag) {
+            (DataTag::Nil, DataTag::Nil) => true,
+            (DataTag::Integer, DataTag::Integer) | (DataTag::Float, _) | (_, DataTag::Float) => {
+                self.data.as_float() <= other.data.as_float()
+            }
+            _ => panic!("cannot compare values of non-numeric objects"),
+        }
+    }
+
+    fn gt(&self, other: &Self) -> bool {
+        match (self.tag, other.tag) {
+            (DataTag::Nil, DataTag::Nil) => false,
+            (DataTag::Integer, DataTag::Integer) | (DataTag::Float, _) | (_, DataTag::Float) => {
+                self.data.as_float() > other.data.as_float()
+            }
+            _ => panic!("cannot compare values of non-numeric objects"),
+        }
+    }
+
+    fn ge(&self, other: &Self) -> bool {
+        match (self.tag, other.tag) {
+            (DataTag::Nil, DataTag::Nil) => true,
+            (DataTag::Integer, DataTag::Integer) | (DataTag::Float, _) | (_, DataTag::Float) => {
+                self.data.as_float() >= other.data.as_float()
+            }
+            _ => panic!("cannot compare values of non-numeric objects"),
+        }
+    }
+}
+
+impl Add for Object {
+    type Output = Object;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self.tag, rhs.tag) {
+            (DataTag::Nil, DataTag::Nil) => rhs,
+            (DataTag::Float, DataTag::Float)
+            | (DataTag::Integer, DataTag::Float)
+            | (DataTag::Float, DataTag::Integer) => {
+                let val = self.data.as_float() + rhs.data.as_float();
+                Object::new(DataTag::Float, Value { f: val })
+            }
+            (DataTag::Integer, DataTag::Integer) => {
+                let val = self.data.as_float() + rhs.data.as_float();
+                Object::new(DataTag::Integer, Value { f: val })
+            }
+            _ => panic!("cannot add types {:?} and {:?}", self.tag, rhs.tag),
+        }
+    }
+}
+
+impl Sub for Object {
+    type Output = Object;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        match (self.tag, rhs.tag) {
+            (DataTag::Nil, DataTag::Nil) => rhs,
+            (DataTag::Float, DataTag::Float)
+            | (DataTag::Integer, DataTag::Float)
+            | (DataTag::Float, DataTag::Integer) => {
+                let val = self.data.as_float() - rhs.data.as_float();
+                Object::new(DataTag::Float, Value { f: val })
+            }
+            (DataTag::Integer, DataTag::Integer) => {
+                let val = self.data.as_float() - rhs.data.as_float();
+                Object::new(DataTag::Integer, Value { f: val })
+            }
+            _ => panic!("cannot sub types {:?} and {:?}", self.tag, rhs.tag),
+        }
+    }
+}
+
+impl Mul for Object {
+    type Output = Object;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        match (self.tag, rhs.tag) {
+            (DataTag::Nil, DataTag::Nil) => rhs,
+            (DataTag::Float, DataTag::Float)
+            | (DataTag::Integer, DataTag::Float)
+            | (DataTag::Float, DataTag::Integer) => {
+                let val = self.data.as_float() * rhs.data.as_float();
+                Object::new(DataTag::Float, Value { f: val })
+            }
+            (DataTag::Integer, DataTag::Integer) => {
+                let val = self.data.as_float() * rhs.data.as_float();
+                Object::new(DataTag::Integer, Value { f: val })
+            }
+            _ => panic!("cannot mul types {:?} and {:?}", self.tag, rhs.tag),
+        }
+    }
+}
+
+impl Div for Object {
+    type Output = Object;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        match (self.tag, rhs.tag) {
+            (DataTag::Nil, DataTag::Nil) => rhs,
+            (DataTag::Float, DataTag::Float)
+            | (DataTag::Integer, DataTag::Float)
+            | (DataTag::Float, DataTag::Integer) => {
+                let val = self.data.as_float() / rhs.data.as_float();
+                Object::new(DataTag::Float, Value { f: val })
+            }
+            (DataTag::Integer, DataTag::Integer) => {
+                let val = self.data.as_float() / rhs.data.as_float();
+                Object::new(DataTag::Integer, Value { f: val })
+            }
+            _ => panic!("cannot div types {:?} and {:?}", self.tag, rhs.tag),
+        }
+    }
+}
+
+impl Neg for Object {
+    type Output = Object;
+
+    fn neg(self) -> Self::Output {
+        match self.tag {
+            DataTag::Nil => self,
+            DataTag::Float | DataTag::Integer => {
+                let val = -self.data.as_float();
+                Object::new(self.tag, Value { f: val })
+            }
+            _ => panic!("cannot negate types {:?}", self.tag),
+        }
+    }
+}
+
+impl PartialEq<Self> for Object {
+    fn eq(&self, other: &Self) -> bool {
+        self.tag == other.tag
+            && match self.tag {
+                DataTag::Nil => true,
+                DataTag::Float => self.data.as_float() == other.data.as_float(),
+                DataTag::Bool => self.data.as_bool() == other.data.as_bool(),
+                DataTag::Pointer => self.data.as_ptr() == other.data.as_ptr(),
+                DataTag::Char => self.data.as_byte() == other.data.as_byte(),
+                DataTag::Integer => self.data.as_integer() == other.data.as_integer(),
+                DataTag::Byte => self.data.as_byte() == other.data.as_byte(),
+                DataTag::UInt => self.data.as_uint() == other.data.as_uint(),
+                DataTag::Text => self.data.as_text() == other.data.as_text(),
+                DataTag::ConstText => self.data.as_text() == other.data.as_text(),
+                DataTag::Array => {
+                    // todo: Find a way to compare arrays
+                    true
+                }
+            }
+    }
 }
 
 impl Display for Object {

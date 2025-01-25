@@ -19,10 +19,22 @@ pub enum Instruction {
     SPool = 15,
     ALoad = 16,
     AStore = 17,
+    If = 18,
+    Else = 19,
+    ElseIf = 20,
+    EndIf = 21,
+    Eq = 22,
+    Neq = 23,
+    Gt = 24,
+    Ge = 25,
+    Lt = 26,
+    Le = 27,
+    And = 28,
+    Or = 29,
 }
 
 impl Instruction {
-    pub const INSTRUCTIONS: [&'static str; 18] = [
+    pub const INSTRUCTIONS: [&'static str; 30] = [
         "halt",     // 0
         "push",     // 1
         "add",      // 2
@@ -41,6 +53,18 @@ impl Instruction {
         "spush",    // 15
         "aload",    // 16
         "astore",   // 17
+        "if",       // 18
+        "else",     // 19
+        "elseif",   // 20
+        "endif",    // 21
+        "eq",       // 22
+        "neq",      //  23
+        "gt",       // 24
+        "ge",       // 25
+        "lt",       // 26
+        "le",       // 27
+        "and",      // 28
+        "or",       // 29
     ];
 
     /// Return the human-readable name of this instruction.
@@ -69,6 +93,18 @@ impl Instruction {
             15 => Instruction::SPool,
             16 => Instruction::ALoad,
             17 => Instruction::AStore,
+            18 => Instruction::If,
+            19 => Instruction::Else,
+            20 => Instruction::ElseIf,
+            21 => Instruction::EndIf,
+            22 => Instruction::Eq,
+            23 => Instruction::Neq,
+            24 => Instruction::Gt,
+            25 => Instruction::Ge,
+            26 => Instruction::Lt,
+            27 => Instruction::Le,
+            28 => Instruction::And,
+            29 => Instruction::Or,
             _ => {
                 panic!("Unknown opcode {}", opcode);
             }
@@ -95,6 +131,18 @@ impl Instruction {
             "spool" => Some(Instruction::SPool),
             "aload" => Some(Instruction::ALoad),
             "astore" => Some(Instruction::AStore),
+            "if" => Some(Instruction::If),
+            "else" => Some(Instruction::Else),
+            "elseif" => Some(Instruction::EndIf),
+            "endif" => Some(Instruction::EndIf),
+            "eq" => Some(Instruction::Eq),
+            "neq" => Some(Instruction::Neq),
+            "gt" => Some(Instruction::Gt),
+            "ge" => Some(Instruction::Ge),
+            "lt" => Some(Instruction::Lt),
+            "le" => Some(Instruction::Le),
+            "and" => Some(Instruction::And),
+            "or" => Some(Instruction::Or),
             _ => None,
         }
     }
