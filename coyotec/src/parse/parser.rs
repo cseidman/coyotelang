@@ -47,7 +47,7 @@ impl Parser {
     fn raise_error(&mut self, msg: &str) {
         self.has_error = true;
         let current = self.current;
-        let token = self.tokens[current].clone();
+        let token = self.tokens[current - 1].clone();
         let line = self
             .source_code
             .lines()
@@ -134,8 +134,14 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Node> {
+        let node = Node::new(NodeType::Root, None);
+        self.parse_to_node(node)
+    }
+
+    pub fn parse_to_node(&mut self, node: Node) -> Result<Node> {
+        let mut node = node;
+
         // This is the starting point
-        let mut node = Node::new(NodeType::Root, None);
         while let Some(token) = self.peek() {
             match token.token_type {
                 TokenType::Let => {
@@ -167,31 +173,55 @@ impl Parser {
                     node.add_child(n);
                     continue;
                 }
+                TokenType::Else | TokenType::EndIf => {
+                    return Ok(node);
+                }
+
                 TokenType::If => {
                     self.advance();
-                    println!("Starting if");
+                    // Root of the IF node
                     let mut if_node = Node::new(NodeType::If, self.current_token());
 
+                    // Add the logical condition to the IF node
                     let condition = self.parse_expr(0)?;
-                    println!("Made condition: {:?}", condition);
                     if_node.add_child(condition);
-                    let statements = self.parse();
+                    // Start the scope block
+                    let mut block = Node::new(NodeType::Block, self.current_token());
+                    if_node.add_child(block);
+                    // Parse all the statements inside the TRUE portion of the IF
 
-                    while self.match_token(TokenType::ElseIf) {
-                        let mut elseif_node = Node::new(NodeType::ElseIf, self.current_token());
-                        let condition = self.parse_expr(0)?;
-                        elseif_node.add_child(condition);
-                        if_node.add_child(elseif_node);
+                    if_node = self.parse_to_node(if_node.clone()).unwrap();
+                    let end_block = Node::new(NodeType::EndBlock, self.current_token());
+                    if_node.add_child(end_block);
+
+                    if let Some(token) = self.peek() {
+                        match token.token_type {
+                            TokenType::Else => {
+                                self.advance();
+                                let mut else_node = Node::new(NodeType::Else, self.current_token());
+                                let block = Node::new(NodeType::Block, self.current_token());
+                                else_node.add_child(block);
+                                else_node = self.parse_to_node(else_node).unwrap();
+                                let end_block = Node::new(NodeType::EndBlock, self.current_token());
+                                else_node.add_child(end_block);
+                                if_node.add_child(else_node);
+                            }
+                            TokenType::EndIf => {
+                                self.advance();
+                                let endif = Node::new(NodeType::EndIf, self.current_token());
+
+                                // Add the ENDIF block
+                                if_node.add_child(endif);
+                                // Add the whole thing to the parent node
+                            }
+                            _ => {
+                                continue;
+                            }
+                        }
                     }
 
-                    if self.match_token(TokenType::Else) {
-                        let else_node = Node::new(NodeType::Else, self.current_token());
-                        if_node.add_child(else_node);
-                    }
+                    // If we got here, it's because we encountered the ENDIF token
 
-                    self.expect_token(TokenType::EndIf)?;
-                    let else_node = Node::new(NodeType::EndIf, self.current_token());
-                    if_node.add_child(else_node);
                     node.add_child(if_node);
                 }
                 _ => {
@@ -216,12 +246,20 @@ impl Parser {
     fn expect_token(&mut self, token_type: TokenType) -> Result<Token> {
         if let Some(t) = self.peek() {
             if t.token_type == token_type {
-                return Ok(self.advance().unwrap());
+                Ok(self.advance().unwrap())
+            } else {
+                let msg = format!(
+                    "Expected token {:?} but found {:?}",
+                    token_type, t.token_type
+                );
+                self.raise_error(&msg);
+                Err(Error::msg(msg))
             }
+        } else {
+            let msg = "No more tokens left";
+            self.raise_error(msg);
+            Err(Error::msg(msg))
         }
-        let msg = format!("Expected token {:?} not found", token_type);
-        self.raise_error(&msg);
-        Err(Error::msg(msg))
     }
 
     /// Digs down to the base unit: a number, an identifier, or a parenthesized sub-expression

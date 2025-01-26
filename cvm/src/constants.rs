@@ -31,10 +31,12 @@ pub enum Instruction {
     Le = 27,
     And = 28,
     Or = 29,
+    JmpFalse = 30,
+    Jmp = 31,
 }
 
 impl Instruction {
-    pub const INSTRUCTIONS: [&'static str; 30] = [
+    pub const INSTRUCTIONS: [&'static str; 32] = [
         "halt",     // 0
         "push",     // 1
         "add",      // 2
@@ -65,6 +67,8 @@ impl Instruction {
         "le",       // 27
         "and",      // 28
         "or",       // 29
+        "jmpfalse", // 30
+        "jmp",      // 31
     ];
 
     /// Return the human-readable name of this instruction.
@@ -105,6 +109,8 @@ impl Instruction {
             27 => Instruction::Le,
             28 => Instruction::And,
             29 => Instruction::Or,
+            30 => Instruction::JmpFalse,
+            31 => Instruction::Jmp,
             _ => {
                 panic!("Unknown opcode {}", opcode);
             }
@@ -143,6 +149,9 @@ impl Instruction {
             "le" => Some(Instruction::Le),
             "and" => Some(Instruction::And),
             "or" => Some(Instruction::Or),
+            "jmpfalse" => Some(Instruction::JmpFalse),
+            "jmp" => Some(Instruction::Jmp),
+
             _ => None,
         }
     }

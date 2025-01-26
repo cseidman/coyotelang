@@ -1,4 +1,5 @@
 #![allow(unused_assignments, unused_variables)]
+use crate::ast::node::display_tree;
 use crate::generator::generate;
 use crate::lexer::{lex, SourceType};
 use crate::parse::parser::parse;
@@ -12,9 +13,10 @@ pub fn compile(code: &str, source_type: SourceType) -> Result<Vec<u8>> {
     // Empty vector to hold the compiled bytecode
     let mut bytecode = Vec::new();
     let tokens = lex(code, source_type)?;
-
+    //tokens.iter().for_each(|token| println!("{:?}", token));
     // Parse the tokens
     if let Ok(node) = parse(tokens, code.to_string()) {
+        display_tree(&node);
         // Generate the assembly code
         let asm = generate(&node);
         println!("{}", asm);

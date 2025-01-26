@@ -161,7 +161,7 @@ pub fn display_tree(node: &Node) {
     // to control indentation.
     fn print_node(node: &Node, depth: usize) {
         let indent = "  ".repeat(depth); // 2 spaces per level
-        println!("{}NodeType: {}", indent, node.node_type);
+        println!("{}{}", indent, node.node_type);
 
         // Recursively print each child, increasing the depth.
         for child in &node.children {

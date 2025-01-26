@@ -154,6 +154,8 @@ impl Vm {
 
         self.load_globals();
 
+        let start_ip = self.ip;
+
         macro_rules! binop {
             ($op:tt) => {
                 let left = self.pop();
@@ -188,8 +190,9 @@ impl Vm {
         //println!("\nVM Debug");
         //println!("--------");
         loop {
+            //print!("{:05}: ", self.ip - start_ip);
             let b = self.get_instruction();
-            //println!("{} ", b.as_str());
+            //println!("{}", b.as_str());
             match b {
                 Push => {
                     let obj = self.get_const();
@@ -291,6 +294,20 @@ impl Vm {
                     let obj = self.stack[slot as usize];
                     self.push(obj);
                 }
+                Jmp => {
+                    let offset = self.get_integer();
+                    self.ip += offset;
+                }
+                JmpFalse => {
+                    let offset = self.get_integer();
+
+                    let ip = self.ip;
+                    let obj = self.pop();
+                    if !obj.data.as_bool() {
+                        self.ip += offset;
+                    }
+                }
+
                 // Get an element from an index
                 ALoad => {
                     // Get the index

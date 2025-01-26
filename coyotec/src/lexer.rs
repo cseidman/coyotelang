@@ -173,6 +173,10 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
                 "let" => lexer.make_token(TokenType::Let),
                 "func" => lexer.make_token(TokenType::Func),
                 "print" => lexer.make_token(TokenType::Print),
+                "if" => lexer.make_token(TokenType::If),
+                "else" => lexer.make_token(TokenType::Else),
+                "elseif" => lexer.make_token(TokenType::ElseIf),
+                "endif" => lexer.make_token(TokenType::EndIf),
                 // Keywords
                 "and" => lexer.make_token(TokenType::And),
                 "or" => lexer.make_token(TokenType::Or),

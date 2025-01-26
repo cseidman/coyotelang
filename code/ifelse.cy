@@ -1,4 +1,6 @@
-let x = 10
-if x > 5 {
+if 6 == 5
     print "Okay"
-}
+else
+    print "Yo"
+endif
+print "Then"

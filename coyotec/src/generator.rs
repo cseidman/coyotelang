@@ -6,36 +6,58 @@ use crate::ast::tree::Node;
 use crate::tokens::TokenType;
 use std::fmt::{Display, Formatter};
 
+const OPERATOR_LENGTH: usize = 1;
+const OPERAND_LENGTH: usize = 8;
+
 /// These are the instructions that the IR will have
 /// The IR will be in SSA form
 
 struct Symbols {
     list: Vec<String>,
-    syp: usize,
+    var_count: usize,
 }
 impl Symbols {
     fn new() -> Self {
         Self {
             list: vec![],
-            syp: 0,
+            var_count: 0,
         }
     }
 
     fn register_symbol(&mut self, symbol: String) -> usize {
         self.list.push(symbol.clone());
-        self.syp += 1;
-        self.syp - 1
+        self.var_count += 1;
+        self.var_count - 1
+    }
+}
+
+pub struct Instruction {
+    start_location: usize,
+    instruction_size: usize,
+    code: String,
+    jumped: bool,
+}
+
+impl Display for Instruction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self.instruction_size > 0 {
+            write!(f, "|{:06}| ", self.start_location)?;
+        }
+        write!(f, "{}", self.code)
     }
 }
 
 pub struct IrGenerator {
-    instructions: Vec<String>,
+    instructions: Vec<Instruction>,
+    current_location: usize,
     string_pool: Vec<String>,
     strings_index: usize,
 
     scope: usize,
     offset: usize,
     symbol_loc: Vec<Symbols>,
+
+    jmp_counter: usize,
 }
 
 pub fn generate(node: &Node) -> String {
@@ -66,11 +88,13 @@ impl IrGenerator {
     pub fn new(node: &Node) -> Self {
         Self {
             instructions: Vec::new(),
+            current_location: 0,
             string_pool: Vec::new(),
             strings_index: 0,
             scope: 0,
             offset: 0,
             symbol_loc: vec![Symbols::new()],
+            jmp_counter: 0,
         }
     }
 
@@ -78,6 +102,11 @@ impl IrGenerator {
     /// generator, but we need to clear the instructions before each run
     pub fn clear(&mut self) {
         self.instructions.clear()
+    }
+
+    fn next_jmp_counter(&mut self) -> usize {
+        self.jmp_counter += 1;
+        self.jmp_counter - 1
     }
 
     /// Get the location of a string in the string pool. If the string is not found, it will be added
@@ -107,25 +136,25 @@ impl IrGenerator {
 
     fn get_variable(&mut self, name: &str) -> usize {
         let scope = self.scope;
-        let location = self.offset;
-        if let Some(index) = self.symbol_loc[scope].list.iter().position(|x| x == name) {
-            return index + location;
+        let mut offset = self.offset;
+        for i in (0..=scope).rev() {
+            if let Some(index) = self.symbol_loc[i].list.iter().position(|x| x == name) {
+                return index + offset;
+            }
+            if i > 0 {
+                offset -= self.symbol_loc[i - 1].var_count;
+            }
         }
-        // The variable was not found, so we check in the global space (scope 0)
-        if let Some(index) = self.get_global(name) {
-            return index;
-        }
-
         panic!("Variable '{name}' not found in symbol loc");
     }
 
     fn push_scope(&mut self) {
         let scope = self.scope;
-        let offset = self.symbol_loc[scope].syp;
+        let offset = self.symbol_loc[scope].var_count;
         self.scope += 1;
         self.symbol_loc.push(Symbols::new());
         self.offset += offset;
-        self.push(format!("# push scope : offset={}", self.offset));
+        self.push(format!("# push scope : offset={}", self.offset), 0);
     }
 
     fn pop_scope(&mut self) {
@@ -134,12 +163,20 @@ impl IrGenerator {
         self.symbol_loc.pop();
         // Return the offset back to where it was
         let scope = self.scope;
-        self.offset -= self.symbol_loc[scope].syp;
-        self.push(format!("# pop scope : offset={}", self.offset));
+        self.offset -= self.symbol_loc[scope].var_count;
+        self.push(format!("# pop scope : offset={}", self.offset), 0);
     }
 
-    fn push(&mut self, instruction: String) {
-        self.instructions.push(instruction);
+    fn push<T: ToString>(&mut self, instruction: T, size: usize) {
+        let instr = Instruction {
+            start_location: self.current_location,
+            instruction_size: size,
+            code: instruction.to_string(),
+            jumped: false,
+        };
+
+        self.current_location += size;
+        self.instructions.push(instr);
     }
 
     pub fn generate(&mut self, node: &Node) {
@@ -152,17 +189,17 @@ impl IrGenerator {
 
         match node.clone().node_type {
             NodeType::Integer(value) => {
-                self.push(format!("push {} ;", value));
+                self.push(format!("push {} ;", value), 1 + OPERAND_LENGTH + 1);
             }
             NodeType::Float(value) => {
-                self.push(format!("push {} ;", value));
+                self.push(format!("push {} ;", value), 1 + OPERAND_LENGTH + 1);
             }
             NodeType::Text(value) => {
                 let loc = self.get_string_location(&*value);
-                self.push(format!("spool {} ;", loc));
+                self.push(format!("spool {} ;", loc), 1 + OPERAND_LENGTH);
             }
             NodeType::Boolean(value) => {
-                self.push(format!("push {} ;", value));
+                self.push(format!("push {} ;", value), 1 + OPERAND_LENGTH + 1);
             }
 
             NodeType::Block => {
@@ -179,46 +216,46 @@ impl IrGenerator {
                 }
                 match op {
                     BinOp::Add => {
-                        self.push(format!("add ;"));
+                        self.push(format!("add ;"), 1);
                     }
                     BinOp::Sub => {
-                        self.push(format!("sub ;"));
+                        self.push(format!("sub ;"), 1);
                     }
                     BinOp::Mul => {
-                        self.push(format!("mul ;"));
+                        self.push(format!("mul ;"), 1);
                     }
                     BinOp::Div => {
-                        self.push(format!("div ;"));
+                        self.push(format!("div ;"), 1);
                     }
                     BinOp::Pow => {
-                        self.push(format!("pow ;"));
+                        self.push(format!("pow ;"), 1);
                     }
                     BinOp::Assign => {
                         //self.push(format!("set ;"));
                     }
                     BinOp::And => {
-                        self.push(format!("and ;"));
+                        self.push(format!("and ;"), 1);
                     }
                     BinOp::Or => {
-                        self.push(format!("or ;"));
+                        self.push(format!("or ;"), 1);
                     }
                     BinOp::GreaterThanEqual => {
-                        self.push(format!("ge ;"));
+                        self.push(format!("ge ;"), 1);
                     }
                     BinOp::GreaterThan => {
-                        self.push(format!("gt ;"));
+                        self.push(format!("gt ;"), 1);
                     }
                     BinOp::LessThanEqual => {
-                        self.push(format!("le ;"));
+                        self.push(format!("le ;"), 1);
                     }
                     BinOp::LessThan => {
-                        self.push(format!("lt ;"));
+                        self.push(format!("lt ;"), 1);
                     }
                     BinOp::EqualEqual => {
-                        self.push(format!("eq ;"));
+                        self.push(format!("eq ;"), 1);
                     }
                     BinOp::NotEqual => {
-                        self.push(format!("neq ;"));
+                        self.push(format!("neq ;"), 1);
                     }
                 }
             }
@@ -228,7 +265,7 @@ impl IrGenerator {
                 }
                 match op {
                     UnOp::Neg | UnOp::Not => {
-                        self.push(format!("neg ;"));
+                        self.push(format!("neg ;"), 1);
                     }
                 }
             }
@@ -253,14 +290,17 @@ impl IrGenerator {
                     // Generate the expression that gets assigned to the variable
                     self.generate_code(next_node);
                     // Generate the storage command
-                    self.push(format!("store {location} ; # name={var_name}",));
+                    self.push(
+                        format!("store {location} ; # name={var_name}",),
+                        1 + OPERAND_LENGTH + 1,
+                    );
                 }
             }
             NodeType::Print => {
                 for c in &node.children {
                     self.generate_code(c);
                 }
-                self.push(format!("print ;"));
+                self.push(format!("print ;"), 1);
             }
             NodeType::Ident(name) => {
                 let index = self.get_variable(&name);
@@ -268,17 +308,23 @@ impl IrGenerator {
                 if node.children.len() == 1 {
                     self.generate_code(&node.children[0]);
                     if node.can_assign {
-                        self.push(format!("store {index};"));
+                        self.push(format!("store {index};"), 1 + OPERAND_LENGTH + 1);
                     } else {
-                        self.push(format!("aload {index};"));
+                        self.push(format!("aload {index};"), 1 + OPERAND_LENGTH + 1);
                     }
 
                     return;
                 }
                 if node.can_assign {
-                    self.push(format!("store {index}; # name = {name}"));
+                    self.push(
+                        format!("store {index}; # name = {name}"),
+                        1 + OPERAND_LENGTH + 1,
+                    );
                 } else {
-                    self.push(format!("load {index}; # name = {name}"));
+                    self.push(
+                        format!("load {index}; # name = {name}"),
+                        1 + OPERAND_LENGTH + 1,
+                    );
                 }
             }
             // We don't need to capture the internal elements here because we're drilling
@@ -288,13 +334,56 @@ impl IrGenerator {
                     self.generate_code(child);
                 }
                 let element_count = &node.children.len();
-                self.push(format!("newarray {element_count} ;"));
+                self.push(
+                    format!("newarray {element_count} ;"),
+                    1 + OPERAND_LENGTH + 1,
+                );
+            }
+
+            NodeType::If => {
+                // Generate conditions
+                for child in &node.children {
+                    self.generate_code(child);
+                }
+                self.push("jmpfalse J0;", 1 + OPERAND_LENGTH + 1);
+            }
+            NodeType::Else => {
+                self.push("jmp J0;", 1 + OPERAND_LENGTH + 1);
+                for mut instr in self.instructions.iter_mut().rev() {
+                    if instr.code == "jmpfalse J0;" {
+                        let offset =
+                            self.current_location - (instr.start_location + OPERAND_LENGTH - 1);
+                        instr.code = format!(
+                            "jmpfalse {offset}; # to {}",
+                            instr.start_location + offset + OPERAND_LENGTH
+                        );
+                    }
+                }
+            }
+            NodeType::EndIf => {
+                for mut instr in self.instructions.iter_mut().rev() {
+                    if instr.code == "jmpfalse J0;" {
+                        let offset =
+                            self.current_location - (instr.start_location + OPERAND_LENGTH + 1);
+                        instr.code =
+                            format!("jmpfalse {offset} ; # to {}", offset + OPERAND_LENGTH - 1);
+                    }
+                }
+                for mut instr in self.instructions.iter_mut().rev() {
+                    if instr.code == "jmp J0;" {
+                        let offset =
+                            self.current_location - (instr.start_location + OPERAND_LENGTH + 1);
+                        instr.code =
+                            format!("jmp {offset} ; # to {}", instr.start_location + offset + 8);
+                    }
+                }
             }
 
             NodeType::Root => {
                 for child in &node.children {
                     self.generate_code(child);
                 }
+                self.push("Halt ;", 1);
             }
             _ => {
                 println!(".end")

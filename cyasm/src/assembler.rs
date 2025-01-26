@@ -112,14 +112,14 @@ impl<'a> AsmParser<'a> {
                 continue;
             }
 
-            if c == '\n' {
+            if c.is_whitespace() || c == ',' || c == ';' {
                 self.advance();
-                self.line += 1;
                 continue;
             }
 
-            if c.is_whitespace() || c == ',' || c == ';' {
+            if c == '\n' {
                 self.advance();
+                self.line += 1;
                 continue;
             }
 
@@ -128,6 +128,19 @@ impl<'a> AsmParser<'a> {
                     if let Some(c) = self.advance() {
                         if c == '\n' {
                             self.line += 1;
+                            break;
+                        }
+                    }
+                }
+                continue;
+            }
+
+            if c == '|' {
+                self.advance();
+                loop {
+                    if let Some(c) = self.advance() {
+                        if c == '|' {
+                            self.advance();
                             break;
                         }
                     }
