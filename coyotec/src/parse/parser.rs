@@ -133,6 +133,21 @@ impl Parser {
         }
     }
 
+    fn parse_range(&mut self) -> Result<Node> {
+        let mut range = Node::new(NodeType::Range, self.current_token());
+        if let Some(token) = self.peek() {
+            range.add_child(self.parse_expr(0)?);
+        }
+
+        self.expect_token(TokenType::To)?;
+
+        if let Some(token) = self.peek() {
+            range.add_child(self.parse_expr(0)?);
+        }
+
+        Ok(range)
+    }
+
     pub fn parse(&mut self) -> Result<Node> {
         let node = Node::new(NodeType::Root, None);
         self.parse_to_node(node)
@@ -174,8 +189,42 @@ impl Parser {
                     node.add_child(n);
                     continue;
                 }
-                TokenType::Else | TokenType::EndIf => {
+                TokenType::Else | TokenType::EndIf | TokenType::EndFor => {
                     return Ok(node);
+                }
+
+                TokenType::For => {
+                    self.advance();
+                    // The root node for the FOR clause
+                    let mut for_node = Node::new(NodeType::For, self.current_token());
+
+                    // Get an identifier (or nothing) that will hold the increments
+                    if let Some(tok) = self.advance() {
+                        match tok.token_type {
+                            TokenType::Identifier(mut name) => {
+                                if name == "_" {
+                                    name = "$1".to_string();
+                                }
+
+                                let identifier =
+                                    Node::new(Ident(Box::new(name)), self.current_token());
+                                for_node.add_child(identifier);
+                            }
+                            _ => {
+                                return Err(anyhow!("Expected identifier or '_' after `for`"));
+                            }
+                        }
+                    }
+                    self.expect_token(TokenType::In)?;
+
+                    let range = self.parse_range()?;
+                    for_node.add_child(range);
+
+                    let mut code_block = Node::new(NodeType::CodeBlock, self.current_token());
+                    code_block = self.parse_to_node(code_block)?;
+
+                    for_node.add_child(code_block);
+                    node.add_child(for_node);
                 }
 
                 TokenType::If => {
@@ -211,9 +260,11 @@ impl Parser {
                                 self.advance();
                                 let mut else_node = Node::new(NodeType::Else, self.current_token());
                                 let block = Node::new(NodeType::Block, self.current_token());
+
                                 else_node.add_child(block);
                                 else_node = self.parse_to_node(else_node)?;
                                 let end_block = Node::new(NodeType::EndBlock, self.current_token());
+
                                 else_node.add_child(end_block);
                                 if_node.add_child(else_node);
                             }

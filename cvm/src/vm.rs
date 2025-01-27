@@ -170,7 +170,6 @@ impl Vm {
 
                 self.push(obj);
             };
-
         }
 
         macro_rules! cmpop {
@@ -181,7 +180,6 @@ impl Vm {
 
                 self.push(Object::new(DataTag::Bool, Value { b: val }));
             };
-
         }
 
         macro_rules! boolop {

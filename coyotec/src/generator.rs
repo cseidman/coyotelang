@@ -210,52 +210,113 @@ impl IrGenerator {
                 self.pop_scope();
             }
 
+            NodeType::For => {
+                let mut children = node.children.iter().peekable();
+                self.push_scope();
+
+                // Store the iteration variables
+                let mut iter_var_location: usize = 0;
+                if let Some(id_node) = children.next() {
+                    if let NodeType::Ident(name) = &id_node.node_type {
+                        iter_var_location = self.store_variable(name);
+                    }
+                }
+
+                let mut iter2_var_location = self.store_variable("$2");
+
+                let range = children.next().unwrap();
+                // Push the two ends of the range
+                for child in range.children.iter().rev() {
+                    self.generate_code(&child);
+                }
+
+                // Store the beginning of the range
+                self.push(
+                    format!("store {iter_var_location} ; # from",),
+                    1 + OPERAND_LENGTH + 1,
+                );
+
+                // Store the end of the range
+                self.push(
+                    format!("store {iter2_var_location} ; # to",),
+                    1 + OPERAND_LENGTH + 1,
+                );
+
+                let code_block = children.next().unwrap();
+                // Push the two ends of the range
+                for child in code_block.children.iter().rev() {
+                    self.generate_code(&child);
+                }
+
+                // Increment the iterator value
+                self.push(
+                    format!("load {iter_var_location} ;",),
+                    1 + OPERAND_LENGTH + 1,
+                );
+                self.push(format!("push 1 ;",), 1 + OPERAND_LENGTH + 1);
+                self.push(format!("add ;",), 1);
+                self.push(
+                    format!("store {iter_var_location} ;",),
+                    1 + OPERAND_LENGTH + 1,
+                );
+                self.push(
+                    format!("load {iter_var_location} ;",),
+                    1 + OPERAND_LENGTH + 1,
+                );
+                self.push(
+                    format!("load {iter2_var_location} ;",),
+                    1 + OPERAND_LENGTH + 1,
+                );
+                self.push(format!("le ;",), 1 + OPERAND_LENGTH + 1);
+                self.pop_scope();
+            }
+
             NodeType::BinaryOp(op) => {
                 for child in &node.children {
                     self.generate_code(child);
                 }
                 match op {
                     BinOp::Add => {
-                        self.push(format!("add ;"), 1);
+                        self.push("add ;", 1);
                     }
                     BinOp::Sub => {
-                        self.push(format!("sub ;"), 1);
+                        self.push("sub ;", 1);
                     }
                     BinOp::Mul => {
-                        self.push(format!("mul ;"), 1);
+                        self.push("mul ;", 1);
                     }
                     BinOp::Div => {
-                        self.push(format!("div ;"), 1);
+                        self.push("div ;", 1);
                     }
                     BinOp::Pow => {
-                        self.push(format!("pow ;"), 1);
+                        self.push("pow ;", 1);
                     }
                     BinOp::Assign => {
                         //self.push(format!("set ;"));
                     }
                     BinOp::And => {
-                        self.push(format!("and ;"), 1);
+                        self.push("and ;", 1);
                     }
                     BinOp::Or => {
-                        self.push(format!("or ;"), 1);
+                        self.push("or ;", 1);
                     }
                     BinOp::GreaterThanEqual => {
-                        self.push(format!("ge ;"), 1);
+                        self.push("ge ;", 1);
                     }
                     BinOp::GreaterThan => {
-                        self.push(format!("gt ;"), 1);
+                        self.push("gt ;", 1);
                     }
                     BinOp::LessThanEqual => {
-                        self.push(format!("le ;"), 1);
+                        self.push("le ;", 1);
                     }
                     BinOp::LessThan => {
-                        self.push(format!("lt ;"), 1);
+                        self.push("lt ;", 1);
                     }
                     BinOp::EqualEqual => {
-                        self.push(format!("eq ;"), 1);
+                        self.push("eq ;", 1);
                     }
                     BinOp::NotEqual => {
-                        self.push(format!("neq ;"), 1);
+                        self.push("neq ;", 1);
                     }
                 }
             }
@@ -265,7 +326,7 @@ impl IrGenerator {
                 }
                 match op {
                     UnOp::Neg | UnOp::Not => {
-                        self.push(format!("neg ;"), 1);
+                        self.push("neg ;", 1);
                     }
                 }
             }
@@ -283,7 +344,6 @@ impl IrGenerator {
                     );
                 };
 
-                let data_type = node.return_type;
                 let location = self.store_variable(&var_name);
                 // Check the next child in an assignment operator
                 if let Some(next_node) = node.children.get(0) {
@@ -300,7 +360,7 @@ impl IrGenerator {
                 for c in &node.children {
                     self.generate_code(c);
                 }
-                self.push(format!("print ;"), 1);
+                self.push("print ;", 1);
             }
             NodeType::Ident(name) => {
                 let index = self.get_variable(&name);

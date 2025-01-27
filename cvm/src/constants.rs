@@ -19,10 +19,12 @@ pub enum Instruction {
     SPool = 15,
     ALoad = 16,
     AStore = 17,
+
     If = 18,
     Else = 19,
     ElseIf = 20,
     EndIf = 21,
+
     Eq = 22,
     Neq = 23,
     Gt = 24,
@@ -31,12 +33,16 @@ pub enum Instruction {
     Le = 27,
     And = 28,
     Or = 29,
+
     JmpFalse = 30,
     Jmp = 31,
+
+    For = 32,
+    While = 33,
 }
 
 impl Instruction {
-    pub const INSTRUCTIONS: [&'static str; 32] = [
+    pub const INSTRUCTIONS: [&'static str; 34] = [
         "halt",     // 0
         "push",     // 1
         "add",      // 2
@@ -60,7 +66,7 @@ impl Instruction {
         "elseif",   // 20
         "endif",    // 21
         "eq",       // 22
-        "neq",      //  23
+        "neq",      // 23
         "gt",       // 24
         "ge",       // 25
         "lt",       // 26
@@ -69,6 +75,8 @@ impl Instruction {
         "or",       // 29
         "jmpfalse", // 30
         "jmp",      // 31
+        "for",      // 32
+        "while",    // 33
     ];
 
     /// Return the human-readable name of this instruction.
@@ -109,8 +117,11 @@ impl Instruction {
             27 => Instruction::Le,
             28 => Instruction::And,
             29 => Instruction::Or,
+
             30 => Instruction::JmpFalse,
             31 => Instruction::Jmp,
+            32 => Instruction::For,
+            33 => Instruction::While,
             _ => {
                 panic!("Unknown opcode {}", opcode);
             }
@@ -151,7 +162,8 @@ impl Instruction {
             "or" => Some(Instruction::Or),
             "jmpfalse" => Some(Instruction::JmpFalse),
             "jmp" => Some(Instruction::Jmp),
-
+            "for" => Some(Instruction::For),
+            "while" => Some(Instruction::While),
             _ => None,
         }
     }

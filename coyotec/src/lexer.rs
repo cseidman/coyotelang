@@ -180,6 +180,11 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
                 // Keywords
                 "and" => lexer.make_token(TokenType::And),
                 "or" => lexer.make_token(TokenType::Or),
+                "for" => lexer.make_token(TokenType::For),
+                "while" => lexer.make_token(TokenType::While),
+                "in" => lexer.make_token(TokenType::In),
+                "to" => lexer.make_token(TokenType::To),
+                "endfor" => lexer.make_token(TokenType::EndFor),
                 // And if all else fails: identifier
                 _ => lexer.make_token(TokenType::Identifier(ident)),
             };

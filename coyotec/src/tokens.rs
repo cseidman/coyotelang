@@ -85,6 +85,7 @@ pub enum TokenType {
     Newline,
     Dollar,
     Quote,
+    Underscore,
     DataType(BaseType),
     Identifier(String),
     Let,
@@ -98,6 +99,11 @@ pub enum TokenType {
     Not,
     And,
     Or,
+    For,
+    In,
+    To,
+    EndFor,
+    While,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct Location {

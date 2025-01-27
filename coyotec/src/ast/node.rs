@@ -72,6 +72,10 @@ pub enum NodeType {
     Else,
     ElseIf,
     EndIf,
+
+    For,
+    While,
+
     // Statements
     Let,
     Print,
@@ -80,6 +84,8 @@ pub enum NodeType {
     EndBlock,
     Conditional,
     CodeBlock,
+
+    Range,
 }
 
 impl Display for NodeType {
@@ -121,8 +127,14 @@ impl Display for NodeType {
             NodeType::Else => write!(f, "else"),
             NodeType::ElseIf => write!(f, "elseif"),
             NodeType::EndIf => write!(f, "endif"),
+
+            NodeType::For => write!(f, "for"),
+            NodeType::While => write!(f, "while"),
+
             NodeType::Conditional => write!(f, "conditional"),
             NodeType::CodeBlock => write!(f, "codeblock"),
+
+            NodeType::Range => write!(f, "range"),
         }
     }
 }

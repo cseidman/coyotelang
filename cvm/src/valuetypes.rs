@@ -275,6 +275,7 @@ pub union Value {
     pub bytes: [u8; 8],
     pub uint: usize,
     pub byte: u8,
+    pub rptr: *mut Object,
 }
 impl Value {
     pub fn as_integer(&self) -> i64 {
