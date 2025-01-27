@@ -15,7 +15,7 @@ use std::slice::Iter;
 
 use crate::ast::node::NodeType::*;
 use crate::ast::node::UnOp::Neg;
-use crate::ast::node::{BinOp, Node, NodeType, UnOp};
+use crate::ast::node::{display_tree, BinOp, Node, NodeType, UnOp};
 use crate::tokens::{BaseType::*, TokenType::*};
 use crate::{tokens, Deferable};
 
@@ -154,6 +154,7 @@ impl Parser {
                     let mut print_node = Node::new(NodeType::Print, Some(token));
                     print_node.add_child(expr);
                     node.add_child(print_node);
+                    continue;
                 }
 
                 Newline | EOF => {
@@ -182,32 +183,37 @@ impl Parser {
                     // Root of the IF node
                     let mut if_node = Node::new(NodeType::If, self.current_token());
 
-                    // Add the logical condition to the IF node
+                    // This is the condition
+                    let mut conditional = Node::new(Conditional, self.current_token());
+
+                    // Get the condition  expression
                     let condition = self.parse_expr(0)?;
-                    if_node.add_child(condition);
+                    conditional.add_child(condition);
+                    // Add the logical condition to the IF node
+                    if_node.add_child(conditional);
+
                     // Start the scope block
                     let mut block = Node::new(NodeType::Block, self.current_token());
                     if_node.add_child(block);
-                    // Parse all the statements inside the TRUE portion of the IF
 
-                    if_node = self.parse_to_node(if_node.clone()).unwrap();
+                    // Parse all the statements inside the TRUE portion of the IF
+                    if_node = self.parse_to_node(if_node.clone())?;
                     let end_block = Node::new(NodeType::EndBlock, self.current_token());
                     if_node.add_child(end_block);
 
-                    if let Some(token) = self.peek() {
+                    while let Some(token) = self.peek() {
+                        self.advance();
                         match token.token_type {
                             TokenType::Else => {
-                                self.advance();
                                 let mut else_node = Node::new(NodeType::Else, self.current_token());
                                 let block = Node::new(NodeType::Block, self.current_token());
                                 else_node.add_child(block);
-                                else_node = self.parse_to_node(else_node).unwrap();
+                                else_node = self.parse_to_node(else_node)?;
                                 let end_block = Node::new(NodeType::EndBlock, self.current_token());
                                 else_node.add_child(end_block);
                                 if_node.add_child(else_node);
                             }
                             TokenType::EndIf => {
-                                self.advance();
                                 let endif = Node::new(NodeType::EndIf, self.current_token());
 
                                 // Add the ENDIF block
@@ -215,7 +221,7 @@ impl Parser {
                                 // Add the whole thing to the parent node
                             }
                             _ => {
-                                continue;
+                                break;
                             }
                         }
                     }

@@ -154,7 +154,7 @@ impl IrGenerator {
         self.scope += 1;
         self.symbol_loc.push(Symbols::new());
         self.offset += offset;
-        self.push(format!("# push scope : offset={}", self.offset), 0);
+        //self.push(format!("# push scope : offset={}", self.offset), 0);
     }
 
     fn pop_scope(&mut self) {
@@ -164,7 +164,7 @@ impl IrGenerator {
         // Return the offset back to where it was
         let scope = self.scope;
         self.offset -= self.symbol_loc[scope].var_count;
-        self.push(format!("# pop scope : offset={}", self.offset), 0);
+        //self.push(format!("# pop scope : offset={}", self.offset), 0);
     }
 
     fn push<T: ToString>(&mut self, instruction: T, size: usize) {
@@ -196,7 +196,7 @@ impl IrGenerator {
             }
             NodeType::Text(value) => {
                 let loc = self.get_string_location(&*value);
-                self.push(format!("spool {} ;", loc), 1 + OPERAND_LENGTH);
+                self.push(format!("spool {} ;", loc), 1 + OPERAND_LENGTH + 1);
             }
             NodeType::Boolean(value) => {
                 self.push(format!("push {} ;", value), 1 + OPERAND_LENGTH + 1);
@@ -341,40 +341,43 @@ impl IrGenerator {
             }
 
             NodeType::If => {
+                let mut jmp_false_loc: usize = 0;
+                let mut jmp_false_byte_loc: usize = 0;
+
                 // Generate conditions
                 for child in &node.children {
-                    self.generate_code(child);
-                }
-                self.push("jmpfalse J0;", 1 + OPERAND_LENGTH + 1);
-            }
-            NodeType::Else => {
-                self.push("jmp J0;", 1 + OPERAND_LENGTH + 1);
-                for mut instr in self.instructions.iter_mut().rev() {
-                    if instr.code == "jmpfalse J0;" {
-                        let offset =
-                            self.current_location - (instr.start_location + OPERAND_LENGTH - 1);
-                        instr.code = format!(
-                            "jmpfalse {offset}; # to {}",
-                            instr.start_location + offset + OPERAND_LENGTH
-                        );
-                    }
-                }
-            }
-            NodeType::EndIf => {
-                for mut instr in self.instructions.iter_mut().rev() {
-                    if instr.code == "jmpfalse J0;" {
-                        let offset =
-                            self.current_location - (instr.start_location + OPERAND_LENGTH + 1);
-                        instr.code =
-                            format!("jmpfalse {offset} ; # to {}", offset + OPERAND_LENGTH - 1);
-                    }
-                }
-                for mut instr in self.instructions.iter_mut().rev() {
-                    if instr.code == "jmp J0;" {
-                        let offset =
-                            self.current_location - (instr.start_location + OPERAND_LENGTH + 1);
-                        instr.code =
-                            format!("jmp {offset} ; # to {}", instr.start_location + offset + 8);
+                    match child.node_type {
+                        NodeType::Conditional => {
+                            for c in &child.children {
+                                self.generate_code(c);
+                            }
+                            self.push("jmpfalse 0", 1 + OPERAND_LENGTH + 1);
+                            jmp_false_loc = self.instructions.len() - 1;
+                            jmp_false_byte_loc = self.current_location;
+                        }
+                        NodeType::Block => {
+                            self.push_scope();
+                        }
+                        NodeType::EndBlock => {
+                            self.pop_scope();
+                        }
+                        NodeType::Else => {
+                            self.push("# else", 0);
+                            self.instructions[jmp_false_loc].code =
+                                format!("jmpfalse {};", self.current_location - jmp_false_byte_loc);
+
+                            for c in &child.children {
+                                self.generate_code(c);
+                            }
+                        }
+                        NodeType::EndIf => {
+                            self.push("# endif", 0);
+                        }
+                        _ => {
+                            for c in &node.children {
+                                self.generate_code(c);
+                            }
+                        }
                     }
                 }
             }

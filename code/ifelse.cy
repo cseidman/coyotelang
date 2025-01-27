@@ -1,6 +1,6 @@
-if 6 == 5
+if 6 == 6
     print "Okay"
 else
-    print "Yo"
+    print "yo"
 endif
-print "Then"
+

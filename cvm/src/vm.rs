@@ -92,6 +92,14 @@ impl Vm {
         Value { bytes }
     }
 
+    fn get_operand(&mut self) -> usize {
+        self.ip += 1;
+        let bytes: [u8; 8] = self.code[self.ip..self.ip + 8].try_into().unwrap();
+
+        self.ip += 8;
+        f64::from_le_bytes(bytes) as usize
+    }
+
     fn get_integer(&mut self) -> usize {
         self.ip += 1;
         let bytes: [u8; 8] = self.code[self.ip..self.ip + 8].try_into().unwrap();
@@ -251,7 +259,7 @@ impl Vm {
                 }
 
                 Set => {
-                    let slot = self.get_integer();
+                    let slot = self.get_operand();
                     self.stack[slot as usize] = self.pop();
                 }
 
@@ -261,7 +269,7 @@ impl Vm {
                 }
 
                 Newarray => {
-                    let element_count = self.get_integer();
+                    let element_count = self.get_operand();
                     // Create the table as an array
                     let mut arr = Table::<Object>::new();
 
@@ -290,18 +298,17 @@ impl Vm {
                 }
 
                 Load => {
-                    let slot = self.get_integer();
+                    let slot = self.get_operand();
                     let obj = self.stack[slot as usize];
                     self.push(obj);
                 }
                 Jmp => {
-                    let offset = self.get_integer();
+                    let offset = self.get_operand();
                     self.ip += offset;
                 }
                 JmpFalse => {
-                    let offset = self.get_integer();
+                    let offset = self.get_operand();
 
-                    let ip = self.ip;
                     let obj = self.pop();
                     if !obj.data.as_bool() {
                         self.ip += offset;
@@ -313,7 +320,7 @@ impl Vm {
                     // Get the index
                     let index = self.pop().data.as_integer() as usize;
                     // Get the array pointer
-                    let slot = self.get_integer();
+                    let slot = self.get_operand();
                     let obj = self.stack[slot as usize];
                     let ptr = obj.data.as_integer() as usize;
                     // Get the table itself
