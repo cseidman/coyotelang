@@ -75,9 +75,11 @@ pub enum NodeType {
     // Statements
     Let,
     Print,
+
     Block,
     EndBlock,
     Conditional,
+    CodeBlock,
 }
 
 impl Display for NodeType {
@@ -120,6 +122,7 @@ impl Display for NodeType {
             NodeType::ElseIf => write!(f, "elseif"),
             NodeType::EndIf => write!(f, "endif"),
             NodeType::Conditional => write!(f, "conditional"),
+            NodeType::CodeBlock => write!(f, "codeblock"),
         }
     }
 }

@@ -162,8 +162,6 @@ impl Vm {
 
         self.load_globals();
 
-        let start_ip = self.ip;
-
         macro_rules! binop {
             ($op:tt) => {
                 let left = self.pop();

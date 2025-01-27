@@ -344,6 +344,9 @@ impl IrGenerator {
                 let mut jmp_false_loc: usize = 0;
                 let mut jmp_false_byte_loc: usize = 0;
 
+                let mut jmp_true_loc: usize = 0;
+                let mut jmp_true_byte_loc: usize = 0;
+
                 // Generate conditions
                 for child in &node.children {
                     match child.node_type {
@@ -363,20 +366,31 @@ impl IrGenerator {
                         }
                         NodeType::Else => {
                             self.push("# else", 0);
-                            self.instructions[jmp_false_loc].code =
-                                format!("jmpfalse {};", self.current_location - jmp_false_byte_loc);
 
                             for c in &child.children {
                                 self.generate_code(c);
                             }
+
+                            self.instructions[jmp_true_loc].code =
+                                format!("jmp {};", self.current_location - jmp_true_byte_loc);
                         }
                         NodeType::EndIf => {
                             self.push("# endif", 0);
                         }
-                        _ => {
-                            for c in &node.children {
+                        NodeType::CodeBlock => {
+                            // This is the body of the IF statement
+                            for c in &child.children {
                                 self.generate_code(c);
                             }
+                            self.push("jmp 0;", 1 + OPERAND_LENGTH + 1);
+                            jmp_true_loc = self.instructions.len() - 1;
+                            jmp_true_byte_loc = self.current_location;
+
+                            self.instructions[jmp_false_loc].code =
+                                format!("jmpfalse {};", self.current_location - jmp_false_byte_loc);
+                        }
+                        _ => {
+                            continue;
                         }
                     }
                 }

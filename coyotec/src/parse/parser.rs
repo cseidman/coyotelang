@@ -193,18 +193,22 @@ impl Parser {
                     if_node.add_child(conditional);
 
                     // Start the scope block
-                    let mut block = Node::new(NodeType::Block, self.current_token());
+                    let block = Node::new(NodeType::Block, self.current_token());
                     if_node.add_child(block);
 
                     // Parse all the statements inside the TRUE portion of the IF
-                    if_node = self.parse_to_node(if_node.clone())?;
+                    let mut code_block = Node::new(NodeType::CodeBlock, self.current_token());
+                    code_block = self.parse_to_node(code_block)?;
+                    if_node.add_child(code_block);
+
+                    // Close out the scope block
                     let end_block = Node::new(NodeType::EndBlock, self.current_token());
                     if_node.add_child(end_block);
 
-                    while let Some(token) = self.peek() {
-                        self.advance();
-                        match token.token_type {
+                    while let Some(tok) = self.peek() {
+                        match tok.token_type {
                             TokenType::Else => {
+                                self.advance();
                                 let mut else_node = Node::new(NodeType::Else, self.current_token());
                                 let block = Node::new(NodeType::Block, self.current_token());
                                 else_node.add_child(block);
@@ -214,6 +218,7 @@ impl Parser {
                                 if_node.add_child(else_node);
                             }
                             TokenType::EndIf => {
+                                self.advance();
                                 let endif = Node::new(NodeType::EndIf, self.current_token());
 
                                 // Add the ENDIF block
@@ -225,9 +230,6 @@ impl Parser {
                             }
                         }
                     }
-
-                    // If we got here, it's because we encountered the ENDIF token
-
                     node.add_child(if_node);
                 }
                 _ => {
