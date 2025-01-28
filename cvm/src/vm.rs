@@ -158,11 +158,12 @@ impl Vm {
 
     pub fn run(&mut self) {
         self.ip = 0;
+
         self.load_string_pool();
-
         self.load_globals();
-
-        let start_ip = self.ip;
+        // Clear out the bytes we already used and restart at 0
+        self.code.drain(..self.ip);
+        self.ip = 0;
 
         macro_rules! binop {
             ($op:tt) => {
@@ -200,7 +201,7 @@ impl Vm {
                 let ip = self.ip - 1;
                 let b = self.code[ip] as u8;
                 let instr = Instruction::from_u8(b);
-                print!("{:05}: {} ", self.ip - start_ip, instr.as_str());
+                print!("{:05}: {} ", self.ip, instr.as_str());
                 match instr {
                     Push | Store | Load | Jmp | JmpFalse | Newarray | Set => {
                         let bytes: [u8; 8] =
@@ -322,13 +323,13 @@ impl Vm {
                 }
                 Jmp => {
                     let new_loc = self.get_operand();
-                    self.ip = new_loc + start_ip;
+                    self.ip = new_loc;
                 }
                 JmpFalse => {
                     let new_loc = self.get_operand();
                     let obj = self.pop();
                     if !obj.data.as_bool() {
-                        self.ip = new_loc + start_ip;
+                        self.ip = new_loc;
                     }
                 }
 
