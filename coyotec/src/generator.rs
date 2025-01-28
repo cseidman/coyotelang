@@ -366,7 +366,9 @@ impl IrGenerator {
 
             NodeType::If => {
                 let mut jmp_false_loc: usize = 0;
-                let jmp_true_loc: usize = 0;
+                let mut jmp_true_loc: usize = 0;
+
+                let mut has_else = false;
 
                 // Generate conditions
                 for child in &node.children {
@@ -385,16 +387,21 @@ impl IrGenerator {
                             self.pop_scope();
                         }
                         NodeType::Else => {
+                            has_else = true;
                             self.push("# else", 0);
-
+                            instr!("jmp", 0);
+                            jmp_true_loc = self.instructions.len() - 1;
+                            self.instructions[jmp_false_loc].code =
+                                format!("jmpfalse {} ;", self.current_location);
                             for c in &child.children {
                                 self.generate_code(c);
                             }
-
-                            // self.instructions[jmp_true_loc].code =
-                            //     format!("jmp {};", self.current_location);
                         }
                         NodeType::EndIf => {
+                            if has_else {
+                                self.instructions[jmp_true_loc].code =
+                                    format!("jmp {};", self.current_location);
+                            }
                             self.push("# endif", 0);
                         }
                         NodeType::CodeBlock => {
