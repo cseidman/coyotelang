@@ -253,8 +253,6 @@ impl IrGenerator {
                         }
                         NodeType::CodeBlock => {
                             jmp_true_loc = self.current_location;
-                            instr!("load", iter_var_location, "Start incr");
-
                             instr!("load", iter_var_location, "Load the start");
                             instr!("load", iter2_var_location, "Load the target");
                             instr!("ge");
@@ -263,6 +261,7 @@ impl IrGenerator {
                             for ch in &child.children {
                                 self.generate_code(&ch);
                             }
+                            instr!("load", iter_var_location, "Start incr");
                             instr!("push", 1);
                             instr!("add");
                             instr!("store", iter_var_location);
