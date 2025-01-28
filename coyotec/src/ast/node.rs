@@ -74,7 +74,9 @@ pub enum NodeType {
     EndIf,
 
     For,
+    EndFor,
     While,
+    EndWhile,
 
     // Statements
     Let,
@@ -129,7 +131,9 @@ impl Display for NodeType {
             NodeType::EndIf => write!(f, "endif"),
 
             NodeType::For => write!(f, "for"),
+            NodeType::EndFor => write!(f, "endfor"),
             NodeType::While => write!(f, "while"),
+            NodeType::EndWhile => write!(f, "endwhile"),
 
             NodeType::Conditional => write!(f, "conditional"),
             NodeType::CodeBlock => write!(f, "codeblock"),

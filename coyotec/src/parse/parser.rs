@@ -224,6 +224,8 @@ impl Parser {
                     code_block = self.parse_to_node(code_block)?;
 
                     for_node.add_child(code_block);
+                    let endfor_node = Node::new(NodeType::EndFor, self.current_token());
+                    for_node.add_child(endfor_node);
                     node.add_child(for_node);
                 }
 

@@ -234,57 +234,61 @@ impl IrGenerator {
             }
 
             NodeType::For => {
-                let mut children = node.children.iter().peekable();
-                // All variables declared including the accumulator is local to a new scope
-                self.push_scope();
+                let mut jmp_false_loc: usize = 0;
+                let mut jmp_true_loc: usize = 0;
 
-                // Store the iteration variables
-                let mut iter_var_location: usize = 0;
-                if let Some(id_node) = children.next() {
-                    if let NodeType::Ident(name) = &id_node.node_type {
-                        iter_var_location = self.store_variable(name);
+                let mut has_else = false;
+                let mut iter_var_location = 0;
+
+                // Hidden variable containing the name of the target condition
+                let mut iter2_var_location: usize = 0;
+
+                for child in &node.children {
+                    match &child.node_type {
+                        NodeType::Block => {
+                            self.push_scope();
+                        }
+                        NodeType::EndBlock => {
+                            self.pop_scope();
+                        }
+                        NodeType::CodeBlock => {
+                            jmp_true_loc = self.current_location;
+                            instr!("load", iter_var_location, "Start incr");
+
+                            instr!("load", iter_var_location, "Load the start");
+                            instr!("load", iter2_var_location, "Load the target");
+                            instr!("ge");
+                            instr!("jmpfalse", 0);
+                            jmp_false_loc = get_instr_loc!();
+                            for ch in &child.children {
+                                self.generate_code(&ch);
+                            }
+                            instr!("push", 1);
+                            instr!("add");
+                            instr!("store", iter_var_location);
+                        }
+                        NodeType::Range => {
+                            for ch in &child.children {
+                                self.generate_code(ch);
+                            }
+                            instr!("store", iter2_var_location);
+                            instr!("store", iter_var_location);
+                        }
+                        NodeType::Ident(iter_name) => {
+                            // Name of the iteration variable
+                            iter_var_location = self.store_variable(&iter_name);
+                            iter2_var_location = self.store_variable("$2");
+                        }
+                        NodeType::EndFor => {
+                            instr!("jmp", jmp_true_loc);
+                            self.instructions[jmp_false_loc].code =
+                                format!("jmpfalse {}", self.current_location);
+                        }
+                        _ => {
+                            continue;
+                        }
                     }
                 }
-
-                let iter2_var_location: usize = self.store_variable("$2");
-
-                let range = children.next().unwrap();
-                // Push the two ends of the range
-                for child in range.children.iter().rev() {
-                    self.generate_code(&child);
-                }
-
-                // Store the beginning of the range
-                instr!("store", iter_var_location);
-                // .. and the end of the range
-                instr!("store", iter2_var_location);
-
-                let jmp_loop_byte_loc = self.current_location as i64;
-                // Increment the iterator value
-
-                instr!("load", iter_var_location);
-                instr!("load", iter2_var_location);
-
-                instr!("ge");
-
-                let false_loc = self.current_location;
-                instr!("jmpfalse", 0);
-                let instr_loc = get_instr_loc!();
-
-                let code_block = children.next().unwrap();
-                for child in code_block.children.iter().rev() {
-                    self.generate_code(&child);
-                }
-
-                instr!("load", iter_var_location);
-                instr!("push", 1);
-                instr!("add");
-                instr!("store", iter_var_location);
-
-                instr!("jmp", jmp_loop_byte_loc);
-
-                self.instructions[instr_loc].code = format!("jmpfalse {} ;", self.current_location);
-                self.pop_scope();
             }
 
             NodeType::BinaryOp(op) => {
@@ -380,12 +384,7 @@ impl IrGenerator {
                             instr!("jmpfalse", 0);
                             jmp_false_loc = get_instr_loc!();
                         }
-                        NodeType::Block => {
-                            self.push_scope();
-                        }
-                        NodeType::EndBlock => {
-                            self.pop_scope();
-                        }
+
                         NodeType::Else => {
                             has_else = true;
                             self.push("# else", 0);
