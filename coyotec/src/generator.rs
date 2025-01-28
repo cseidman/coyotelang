@@ -1,7 +1,7 @@
 //! Reads the AST and generates IR in SSA form
 #![allow(dead_code, unused_variables)]
 
-use crate::ast::node::{BinOp, NodeType, UnOp};
+use crate::ast::node::{NodeType, UnOp};
 use crate::ast::tree::Node;
 use crate::tokens::TokenType;
 use std::fmt::{Display, Formatter};
@@ -185,21 +185,44 @@ impl IrGenerator {
     }
 
     fn generate_code(&mut self, node: &Node) {
+        macro_rules! instr {
+            ($instr:expr) => {
+                self.push(format!("{} ;", $instr), 1);
+            };
+
+            ($instr:expr, $operand:expr) => {
+                self.push(format!("{} {} ;", $instr, $operand), 1 + OPERAND_LENGTH + 1);
+            };
+
+            ($instr:expr, $operand:expr, $comment:expr) => {
+                self.push(
+                    format!("{} {} ; # {}", $instr, $operand, $comment),
+                    1 + OPERAND_LENGTH + 1,
+                );
+            };
+        }
+
+        macro_rules! get_instr_loc {
+            () => {
+                self.instructions.len() - 1
+            };
+        }
+
         let data_type = &node.return_type;
 
         match node.clone().node_type {
             NodeType::Integer(value) => {
-                self.push(format!("push {} ;", value), 1 + OPERAND_LENGTH + 1);
+                instr!("push", value);
             }
             NodeType::Float(value) => {
-                self.push(format!("push {} ;", value), 1 + OPERAND_LENGTH + 1);
+                instr!("push", value);
             }
             NodeType::Text(value) => {
                 let loc = self.get_string_location(&*value);
-                self.push(format!("spool {} ;", loc), 1 + OPERAND_LENGTH + 1);
+                instr!("spool", loc);
             }
             NodeType::Boolean(value) => {
-                self.push(format!("push {} ;", value), 1 + OPERAND_LENGTH + 1);
+                instr!("push", value);
             }
 
             NodeType::Block => {
@@ -212,6 +235,7 @@ impl IrGenerator {
 
             NodeType::For => {
                 let mut children = node.children.iter().peekable();
+                // All variables declared including the accumulator is local to a new scope
                 self.push_scope();
 
                 // Store the iteration variables
@@ -222,7 +246,7 @@ impl IrGenerator {
                     }
                 }
 
-                let mut iter2_var_location = self.store_variable("$2");
+                let iter2_var_location: usize = self.store_variable("$2");
 
                 let range = children.next().unwrap();
                 // Push the two ends of the range
@@ -231,43 +255,35 @@ impl IrGenerator {
                 }
 
                 // Store the beginning of the range
-                self.push(
-                    format!("store {iter_var_location} ; # from",),
-                    1 + OPERAND_LENGTH + 1,
-                );
+                instr!("store", iter_var_location);
+                // .. and the end of the range
+                instr!("store", iter2_var_location);
 
-                // Store the end of the range
-                self.push(
-                    format!("store {iter2_var_location} ; # to",),
-                    1 + OPERAND_LENGTH + 1,
-                );
+                let jmp_loop_byte_loc = self.current_location as i64;
+                // Increment the iterator value
+
+                instr!("load", iter_var_location);
+                instr!("load", iter2_var_location);
+
+                instr!("ge");
+
+                let false_loc = self.current_location;
+                instr!("jmpfalse", 0);
+                let instr_loc = get_instr_loc!();
 
                 let code_block = children.next().unwrap();
-                // Push the two ends of the range
                 for child in code_block.children.iter().rev() {
                     self.generate_code(&child);
                 }
 
-                // Increment the iterator value
-                self.push(
-                    format!("load {iter_var_location} ;",),
-                    1 + OPERAND_LENGTH + 1,
-                );
-                self.push(format!("push 1 ;",), 1 + OPERAND_LENGTH + 1);
-                self.push(format!("add ;",), 1);
-                self.push(
-                    format!("store {iter_var_location} ;",),
-                    1 + OPERAND_LENGTH + 1,
-                );
-                self.push(
-                    format!("load {iter_var_location} ;",),
-                    1 + OPERAND_LENGTH + 1,
-                );
-                self.push(
-                    format!("load {iter2_var_location} ;",),
-                    1 + OPERAND_LENGTH + 1,
-                );
-                self.push(format!("le ;",), 1 + OPERAND_LENGTH + 1);
+                instr!("load", iter_var_location);
+                instr!("push", 1);
+                instr!("add");
+                instr!("store", iter_var_location);
+
+                instr!("jmp", jmp_loop_byte_loc);
+
+                self.instructions[instr_loc].code = format!("jmpfalse {} ;", self.current_location);
                 self.pop_scope();
             }
 
@@ -275,58 +291,18 @@ impl IrGenerator {
                 for child in &node.children {
                     self.generate_code(child);
                 }
-                match op {
-                    BinOp::Add => {
-                        self.push("add ;", 1);
-                    }
-                    BinOp::Sub => {
-                        self.push("sub ;", 1);
-                    }
-                    BinOp::Mul => {
-                        self.push("mul ;", 1);
-                    }
-                    BinOp::Div => {
-                        self.push("div ;", 1);
-                    }
-                    BinOp::Pow => {
-                        self.push("pow ;", 1);
-                    }
-                    BinOp::Assign => {
-                        //self.push(format!("set ;"));
-                    }
-                    BinOp::And => {
-                        self.push("and ;", 1);
-                    }
-                    BinOp::Or => {
-                        self.push("or ;", 1);
-                    }
-                    BinOp::GreaterThanEqual => {
-                        self.push("ge ;", 1);
-                    }
-                    BinOp::GreaterThan => {
-                        self.push("gt ;", 1);
-                    }
-                    BinOp::LessThanEqual => {
-                        self.push("le ;", 1);
-                    }
-                    BinOp::LessThan => {
-                        self.push("lt ;", 1);
-                    }
-                    BinOp::EqualEqual => {
-                        self.push("eq ;", 1);
-                    }
-                    BinOp::NotEqual => {
-                        self.push("neq ;", 1);
-                    }
-                }
+
+                let binop = format!("{}", op);
+                instr!(binop);
             }
+
             NodeType::UnaryOp(op) => {
                 for child in &node.children {
                     self.generate_code(child);
                 }
                 match op {
                     UnOp::Neg | UnOp::Not => {
-                        self.push("neg ;", 1);
+                        instr!("neg");
                     }
                 }
             }
@@ -350,17 +326,14 @@ impl IrGenerator {
                     // Generate the expression that gets assigned to the variable
                     self.generate_code(next_node);
                     // Generate the storage command
-                    self.push(
-                        format!("store {location} ; # name={var_name}",),
-                        1 + OPERAND_LENGTH + 1,
-                    );
+                    instr!("store", location);
                 }
             }
             NodeType::Print => {
                 for c in &node.children {
                     self.generate_code(c);
                 }
-                self.push("print ;", 1);
+                instr!("print");
             }
             NodeType::Ident(name) => {
                 let index = self.get_variable(&name);
@@ -368,23 +341,17 @@ impl IrGenerator {
                 if node.children.len() == 1 {
                     self.generate_code(&node.children[0]);
                     if node.can_assign {
-                        self.push(format!("store {index};"), 1 + OPERAND_LENGTH + 1);
+                        instr!("store", index);
                     } else {
-                        self.push(format!("aload {index};"), 1 + OPERAND_LENGTH + 1);
+                        instr!("aload", index);
                     }
 
                     return;
                 }
                 if node.can_assign {
-                    self.push(
-                        format!("store {index}; # name = {name}"),
-                        1 + OPERAND_LENGTH + 1,
-                    );
+                    instr!("store", index);
                 } else {
-                    self.push(
-                        format!("load {index}; # name = {name}"),
-                        1 + OPERAND_LENGTH + 1,
-                    );
+                    instr!("load", index);
                 }
             }
             // We don't need to capture the internal elements here because we're drilling
@@ -394,18 +361,12 @@ impl IrGenerator {
                     self.generate_code(child);
                 }
                 let element_count = &node.children.len();
-                self.push(
-                    format!("newarray {element_count} ;"),
-                    1 + OPERAND_LENGTH + 1,
-                );
+                instr!("newarray", element_count);
             }
 
             NodeType::If => {
                 let mut jmp_false_loc: usize = 0;
-                let mut jmp_false_byte_loc: usize = 0;
-
-                let mut jmp_true_loc: usize = 0;
-                let mut jmp_true_byte_loc: usize = 0;
+                let jmp_true_loc: usize = 0;
 
                 // Generate conditions
                 for child in &node.children {
@@ -414,9 +375,8 @@ impl IrGenerator {
                             for c in &child.children {
                                 self.generate_code(c);
                             }
-                            self.push("jmpfalse 0", 1 + OPERAND_LENGTH + 1);
-                            jmp_false_loc = self.instructions.len() - 1;
-                            jmp_false_byte_loc = self.current_location;
+                            instr!("jmpfalse", 0);
+                            jmp_false_loc = get_instr_loc!();
                         }
                         NodeType::Block => {
                             self.push_scope();
@@ -431,8 +391,8 @@ impl IrGenerator {
                                 self.generate_code(c);
                             }
 
-                            self.instructions[jmp_true_loc].code =
-                                format!("jmp {};", self.current_location - jmp_true_byte_loc);
+                            // self.instructions[jmp_true_loc].code =
+                            //     format!("jmp {};", self.current_location);
                         }
                         NodeType::EndIf => {
                             self.push("# endif", 0);
@@ -442,12 +402,9 @@ impl IrGenerator {
                             for c in &child.children {
                                 self.generate_code(c);
                             }
-                            self.push("jmp 0;", 1 + OPERAND_LENGTH + 1);
-                            jmp_true_loc = self.instructions.len() - 1;
-                            jmp_true_byte_loc = self.current_location;
 
                             self.instructions[jmp_false_loc].code =
-                                format!("jmpfalse {};", self.current_location - jmp_false_byte_loc);
+                                format!("jmpfalse {} ;", self.current_location);
                         }
                         _ => {
                             continue;
@@ -460,7 +417,7 @@ impl IrGenerator {
                 for child in &node.children {
                     self.generate_code(child);
                 }
-                self.push("Halt ;", 1);
+                instr!("halt");
             }
             _ => {
                 println!(".end")

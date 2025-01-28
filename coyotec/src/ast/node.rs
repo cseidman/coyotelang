@@ -30,12 +30,12 @@ impl Display for BinOp {
             BinOp::And => write!(f, "and"),
             BinOp::Or => write!(f, "or"),
             BinOp::Assign => write!(f, "or"),
-            BinOp::EqualEqual => write!(f, "=="),
-            BinOp::NotEqual => write!(f, "!="),
-            BinOp::GreaterThan => write!(f, ">"),
-            BinOp::GreaterThanEqual => write!(f, ">="),
-            BinOp::LessThan => write!(f, "<"),
-            BinOp::LessThanEqual => write!(f, "<="),
+            BinOp::EqualEqual => write!(f, "eq"),
+            BinOp::NotEqual => write!(f, "neq"),
+            BinOp::GreaterThan => write!(f, "gt"),
+            BinOp::GreaterThanEqual => write!(f, "ge"),
+            BinOp::LessThan => write!(f, "lt"),
+            BinOp::LessThanEqual => write!(f, "le"),
         }
     }
 }

@@ -1,5 +1,4 @@
 #![allow(unused_assignments, unused_variables)]
-use crate::ast::node::display_tree;
 use crate::generator::generate;
 use crate::lexer::{lex, SourceType};
 use crate::parse::parser::parse;
@@ -16,7 +15,7 @@ pub fn compile(code: &str, source_type: SourceType) -> Result<Vec<u8>> {
     //tokens.iter().for_each(|token| println!("{:?}", token));
     // Parse the tokens
     if let Ok(node) = parse(tokens, code.to_string()) {
-        display_tree(&node);
+        //display_tree(&node);
         // Generate the assembly code
         let asm = generate(&node);
         println!("{}", asm);

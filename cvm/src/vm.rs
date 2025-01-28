@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused_macros)]
 
 const STACK_SIZE: usize = 1_000_000;
 const GLOBAL_SIZE: usize = 1024;
@@ -162,6 +162,8 @@ impl Vm {
 
         self.load_globals();
 
+        let start_ip = self.ip;
+
         macro_rules! binop {
             ($op:tt) => {
                 let left = self.pop();
@@ -191,12 +193,31 @@ impl Vm {
             };
         }
 
-        //println!("\nVM Debug");
-        //println!("--------");
+        macro_rules! vm_debug {
+            () => {
+                println!("\nVM Debug");
+                println!("--------");
+                let ip = self.ip - 1;
+                let b = self.code[ip] as u8;
+                let instr = Instruction::from_u8(b);
+                print!("{:05}: {} ", self.ip - start_ip, instr.as_str());
+                match instr {
+                    Push | Store | Load | Jmp | JmpFalse | Newarray | Set => {
+                        let bytes: [u8; 8] =
+                            self.code[self.ip + 1..self.ip + 9].try_into().unwrap();
+                        let opd = f64::from_le_bytes(bytes) as usize;
+                        println!("{opd}");
+                    }
+                    _ => {
+                        println!();
+                    }
+                }
+            };
+        }
+
         loop {
-            //print!("{:05}: ", self.ip - start_ip);
             let b = self.get_instruction();
-            //println!("{}", b.as_str());
+            //vm_debug!();
             match b {
                 Push => {
                     let obj = self.get_const();
@@ -283,6 +304,7 @@ impl Vm {
                     };
                     self.push(object);
                 }
+
                 Store => {
                     let slot = self.get_integer();
                     let obj = self.pop();
@@ -295,19 +317,18 @@ impl Vm {
 
                 Load => {
                     let slot = self.get_operand();
-                    let obj = self.stack[slot as usize];
+                    let obj = self.stack[slot];
                     self.push(obj);
                 }
                 Jmp => {
-                    let offset = self.get_operand();
-                    self.ip += offset;
+                    let new_loc = self.get_operand();
+                    self.ip = new_loc + start_ip;
                 }
                 JmpFalse => {
-                    let offset = self.get_operand();
-
+                    let new_loc = self.get_operand();
                     let obj = self.pop();
                     if !obj.data.as_bool() {
-                        self.ip += offset;
+                        self.ip = new_loc + start_ip;
                     }
                 }
 
