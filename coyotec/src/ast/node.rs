@@ -78,6 +78,9 @@ pub enum NodeType {
     While,
     EndWhile,
 
+    Break,
+    Continue,
+
     // Statements
     Let,
     Print,
@@ -134,6 +137,9 @@ impl Display for NodeType {
             NodeType::EndFor => write!(f, "endfor"),
             NodeType::While => write!(f, "while"),
             NodeType::EndWhile => write!(f, "endwhile"),
+
+            NodeType::Break => write!(f, "break"),
+            NodeType::Continue => write!(f, "continue"),
 
             NodeType::Conditional => write!(f, "conditional"),
             NodeType::CodeBlock => write!(f, "codeblock"),

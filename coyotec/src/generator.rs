@@ -47,6 +47,26 @@ impl Display for Instruction {
     }
 }
 
+/// Struct for loops
+#[derive(Clone)]
+struct LoopLocations {
+    start_location: usize,
+    exit_location: usize,
+    breaks: Vec<usize>,
+    continue_breaks: Vec<usize>,
+}
+
+impl LoopLocations {
+    pub fn new() -> Self {
+        Self {
+            start_location: 0,
+            exit_location: 0,
+            breaks: Vec::new(),
+            continue_breaks: Vec::new(),
+        }
+    }
+}
+
 pub struct IrGenerator {
     instructions: Vec<Instruction>,
     current_location: usize,
@@ -57,7 +77,8 @@ pub struct IrGenerator {
     offset: usize,
     symbol_loc: Vec<Symbols>,
 
-    jmp_counter: usize,
+    loop_stack: Vec<LoopLocations>,
+    loop_count: usize,
 }
 
 pub fn generate(node: &Node) -> String {
@@ -94,7 +115,8 @@ impl IrGenerator {
             scope: 0,
             offset: 0,
             symbol_loc: vec![Symbols::new()],
-            jmp_counter: 0,
+            loop_stack: Vec::new(),
+            loop_count: 0,
         }
     }
 
@@ -104,9 +126,20 @@ impl IrGenerator {
         self.instructions.clear()
     }
 
-    fn next_jmp_counter(&mut self) -> usize {
-        self.jmp_counter += 1;
-        self.jmp_counter - 1
+    /// Get current loop location struct
+    fn get_loop_locations(&mut self) -> &mut LoopLocations {
+        let cur_loop_location = self.loop_count - 1;
+        &mut self.loop_stack[cur_loop_location]
+    }
+
+    fn push_loop(&mut self, loop_loc: LoopLocations) {
+        self.loop_stack.push(loop_loc);
+        self.loop_count += 1;
+    }
+
+    fn pop_loop(&mut self) {
+        self.loop_stack.pop();
+        self.loop_count -= 1;
     }
 
     /// Get the location of a string in the string pool. If the string is not found, it will be added
@@ -225,6 +258,15 @@ impl IrGenerator {
                 instr!("push", value);
             }
 
+            NodeType::Break => {
+                // Are we in a loop?
+                if self.loop_count > 0 {
+                    instr!("jmp", 0, "inner break");
+                    let loc = get_instr_loc!();
+                    self.get_loop_locations().breaks.push(loc);
+                }
+            }
+
             NodeType::Block => {
                 self.push_scope();
             }
@@ -234,8 +276,7 @@ impl IrGenerator {
             }
 
             NodeType::For => {
-                let mut jmp_false_loc: usize = 0;
-                let mut jmp_true_loc: usize = 0;
+                self.push_loop(LoopLocations::new());
 
                 let mut iter_var_location = 0;
 
@@ -250,13 +291,21 @@ impl IrGenerator {
                         NodeType::EndBlock => {
                             self.pop_scope();
                         }
+
+                        NodeType::Continue => {
+                            instr!("jmp", 0);
+                            let loc = get_instr_loc!();
+                            self.get_loop_locations().continue_breaks.push(loc);
+                        }
+
                         NodeType::CodeBlock => {
-                            jmp_true_loc = self.current_location;
+                            let loc = self.current_location;
+                            self.get_loop_locations().start_location = loc;
                             instr!("load", iter_var_location, "Load the start");
                             instr!("load", iter2_var_location, "Load the target");
                             instr!("ge");
                             instr!("jmpfalse", 0);
-                            jmp_false_loc = get_instr_loc!();
+                            self.get_loop_locations().exit_location = get_instr_loc!();
                             for ch in &child.children {
                                 self.generate_code(&ch);
                             }
@@ -278,15 +327,25 @@ impl IrGenerator {
                             iter2_var_location = self.store_variable("$2");
                         }
                         NodeType::EndFor => {
-                            instr!("jmp", jmp_true_loc);
-                            self.instructions[jmp_false_loc].code =
-                                format!("jmpfalse {}", self.current_location);
+                            let loc = self.get_loop_locations().start_location;
+                            instr!("jmp", loc);
+
+                            let cur_loc = self.current_location;
+                            let instr_loc = self.get_loop_locations().exit_location;
+                            self.instructions[instr_loc].code = format!("jmpfalse {}", cur_loc);
+
+                            let breaks = self.get_loop_locations().clone().breaks;
+
+                            for i in breaks {
+                                self.instructions[i].code = format!("jmp {}; # break", cur_loc);
+                            }
                         }
                         _ => {
                             continue;
                         }
                     }
                 }
+                self.pop_loop();
             }
 
             NodeType::BinaryOp(op) => {

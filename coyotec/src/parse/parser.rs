@@ -193,6 +193,18 @@ impl Parser {
                     return Ok(node);
                 }
 
+                TokenType::Break => {
+                    self.advance();
+                    let break_node = Node::new(NodeType::Break, self.current_token());
+                    node.add_child(break_node);
+                }
+
+                TokenType::Continue => {
+                    self.advance();
+                    let continue_node = Node::new(NodeType::Continue, self.current_token());
+                    node.add_child(continue_node);
+                }
+
                 TokenType::While => {
                     self.advance();
                     let mut while_node = Node::new(NodeType::While, self.current_token());
@@ -234,10 +246,11 @@ impl Parser {
                     let range = self.parse_range()?;
                     for_node.add_child(range);
 
+                    // This is the body of the code
                     let mut code_block = Node::new(NodeType::CodeBlock, self.current_token());
                     code_block = self.parse_to_node(code_block)?;
-
                     for_node.add_child(code_block);
+
                     let endfor_node = Node::new(NodeType::EndFor, self.current_token());
                     self.expect_token(TokenType::EndFor)?;
 
@@ -294,6 +307,7 @@ impl Parser {
                                 if_node.add_child(endif);
                                 // Add the whole thing to the parent node
                             }
+
                             _ => {
                                 break;
                             }
