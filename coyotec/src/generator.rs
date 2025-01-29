@@ -237,7 +237,6 @@ impl IrGenerator {
                 let mut jmp_false_loc: usize = 0;
                 let mut jmp_true_loc: usize = 0;
 
-                let mut has_else = false;
                 let mut iter_var_location = 0;
 
                 // Hidden variable containing the name of the target condition

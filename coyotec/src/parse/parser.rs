@@ -193,6 +193,20 @@ impl Parser {
                     return Ok(node);
                 }
 
+                TokenType::While => {
+                    self.advance();
+                    let mut while_node = Node::new(NodeType::While, self.current_token());
+                    let mut conditional = Node::new(Conditional, self.current_token());
+
+                    // Get the condition  expression
+                    let condition = self.parse_expr(0)?;
+                    conditional.add_child(condition);
+                    // Add the logical condition to the IF node
+                    while_node.add_child(conditional);
+
+                    self.expect_token(TokenType::EndWhile)?;
+                }
+
                 TokenType::For => {
                     self.advance();
                     // The root node for the FOR clause
@@ -225,6 +239,8 @@ impl Parser {
 
                     for_node.add_child(code_block);
                     let endfor_node = Node::new(NodeType::EndFor, self.current_token());
+                    self.expect_token(TokenType::EndFor)?;
+
                     for_node.add_child(endfor_node);
                     node.add_child(for_node);
                 }

@@ -182,9 +182,12 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
                 "or" => lexer.make_token(TokenType::Or),
                 "for" => lexer.make_token(TokenType::For),
                 "while" => lexer.make_token(TokenType::While),
+                "endwhile" => lexer.make_token(TokenType::EndWhile),
                 "in" => lexer.make_token(TokenType::In),
                 "to" => lexer.make_token(TokenType::To),
                 "endfor" => lexer.make_token(TokenType::EndFor),
+                "break" => lexer.make_token(TokenType::Break),
+                "continue" => lexer.make_token(TokenType::Continue),
                 // And if all else fails: identifier
                 _ => lexer.make_token(TokenType::Identifier(ident)),
             };
