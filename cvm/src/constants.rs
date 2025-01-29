@@ -17,7 +17,7 @@ pub enum Instruction {
     Newarray = 13,
     Load = 14,
     SPool = 15,
-    ALoad = 16,
+    Index = 16,
     AStore = 17,
 
     If = 18,
@@ -59,8 +59,8 @@ impl Instruction {
         "const",    // 12
         "newarray", // 13
         "load",     // 14
-        "spush",    // 15
-        "aload",    // 16
+        "spool",    // 15
+        "index",    // 16
         "astore",   // 17
         "if",       // 18
         "else",     // 19
@@ -105,7 +105,7 @@ impl Instruction {
             13 => Instruction::Newarray,
             14 => Instruction::Load,
             15 => Instruction::SPool,
-            16 => Instruction::ALoad,
+            16 => Instruction::Index,
             17 => Instruction::AStore,
             18 => Instruction::If,
             19 => Instruction::Else,
@@ -150,7 +150,7 @@ impl Instruction {
             "newarray" => Some(Instruction::Newarray),
             "load" => Some(Instruction::Load),
             "spool" => Some(Instruction::SPool),
-            "aload" => Some(Instruction::ALoad),
+            "index" => Some(Instruction::Index),
             "astore" => Some(Instruction::AStore),
             "if" => Some(Instruction::If),
             "else" => Some(Instruction::Else),

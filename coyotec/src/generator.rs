@@ -1,7 +1,7 @@
 //! Reads the AST and generates IR in SSA form
 #![allow(dead_code, unused_variables)]
 
-use crate::ast::node::{NodeType, UnOp};
+use crate::ast::node::{BinOp, NodeType, UnOp};
 use crate::ast::tree::Node;
 use crate::tokens::TokenType;
 use std::fmt::{Display, Formatter};
@@ -275,6 +275,51 @@ impl IrGenerator {
                 self.pop_scope();
             }
 
+            NodeType::While => {
+                self.push_loop(LoopLocations::new());
+
+                // Generate conditions
+                for child in &node.children {
+                    match &child.node_type {
+                        NodeType::Conditional => {
+                            let loc = self.current_location;
+                            self.get_loop_locations().start_location = loc;
+
+                            for c in &child.children {
+                                self.generate_code(c);
+                            }
+                            instr!("jmpfalse", 0);
+                            self.get_loop_locations().exit_location = get_instr_loc!();
+                        }
+
+                        //NodeType::EndWhile => {}
+                        NodeType::CodeBlock => {
+                            // This is the body of the while statement
+                            for c in &child.children {
+                                self.generate_code(c);
+                            }
+
+                            let loc = self.get_loop_locations().start_location;
+                            instr!("jmp", loc);
+
+                            let cur_loc = self.current_location;
+                            let instr_loc = self.get_loop_locations().exit_location;
+                            self.instructions[instr_loc].code = format!("jmpfalse {};", cur_loc);
+
+                            let breaks = self.get_loop_locations().clone().breaks;
+
+                            for i in breaks {
+                                self.instructions[i].code = format!("jmp {}; # break", cur_loc);
+                            }
+                        }
+                        _ => {
+                            continue;
+                        }
+                    }
+                }
+                self.pop_loop();
+            }
+
             NodeType::For => {
                 self.push_loop(LoopLocations::new());
 
@@ -285,25 +330,14 @@ impl IrGenerator {
 
                 for child in &node.children {
                     match &child.node_type {
-                        NodeType::Block => {
-                            self.push_scope();
-                        }
-                        NodeType::EndBlock => {
-                            self.pop_scope();
-                        }
-
-                        NodeType::Continue => {
-                            instr!("jmp", 0);
-                            let loc = get_instr_loc!();
-                            self.get_loop_locations().continue_breaks.push(loc);
-                        }
-
                         NodeType::CodeBlock => {
                             let loc = self.current_location;
                             self.get_loop_locations().start_location = loc;
+
                             instr!("load", iter_var_location, "Load the start");
                             instr!("load", iter2_var_location, "Load the target");
                             instr!("ge");
+
                             instr!("jmpfalse", 0);
                             self.get_loop_locations().exit_location = get_instr_loc!();
                             for ch in &child.children {
@@ -352,7 +386,9 @@ impl IrGenerator {
                 for child in &node.children {
                     self.generate_code(child);
                 }
-
+                if op == BinOp::Assign {
+                    return;
+                }
                 let binop = format!("{}", op);
                 instr!(binop);
             }
@@ -387,7 +423,7 @@ impl IrGenerator {
                     // Generate the expression that gets assigned to the variable
                     self.generate_code(next_node);
                     // Generate the storage command
-                    instr!("store", location);
+                    instr!("store", location, format!("store to '{var_name}'"));
                 }
             }
             NodeType::Print => {
@@ -396,23 +432,22 @@ impl IrGenerator {
                 }
                 instr!("print");
             }
+
             NodeType::Ident(name) => {
                 let index = self.get_variable(&name);
-                // Array element
-                if node.children.len() == 1 {
-                    self.generate_code(&node.children[0]);
-                    if node.can_assign {
-                        instr!("store", index);
-                    } else {
-                        instr!("aload", index);
-                    }
-
-                    return;
-                }
                 if node.can_assign {
                     instr!("store", index);
                 } else {
                     instr!("load", index);
+                }
+                for child in &node.children {
+                    match child.node_type {
+                        NodeType::ArrayElement => {
+                            self.generate_code(child);
+                            instr!("index");
+                        }
+                        _ => {}
+                    }
                 }
             }
             // We don't need to capture the internal elements here because we're drilling

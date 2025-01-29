@@ -1,4 +1,6 @@
-while x < 5
+let x = 1
+while x < 4
     print x
-    x = x+5
+    x = x + 1
 endwhile
+print "Done!"

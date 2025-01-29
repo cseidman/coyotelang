@@ -29,7 +29,7 @@ impl Display for BinOp {
             BinOp::Pow => write!(f, "pow"),
             BinOp::And => write!(f, "and"),
             BinOp::Or => write!(f, "or"),
-            BinOp::Assign => write!(f, "or"),
+            BinOp::Assign => write!(f, "assign"),
             BinOp::EqualEqual => write!(f, "eq"),
             BinOp::NotEqual => write!(f, "neq"),
             BinOp::GreaterThan => write!(f, "gt"),
@@ -90,6 +90,8 @@ pub enum NodeType {
     Conditional,
     CodeBlock,
 
+    ArrayElement,
+
     Range,
 }
 
@@ -143,6 +145,8 @@ impl Display for NodeType {
 
             NodeType::Conditional => write!(f, "conditional"),
             NodeType::CodeBlock => write!(f, "codeblock"),
+
+            NodeType::ArrayElement => write!(f, "arrayelement"),
 
             NodeType::Range => write!(f, "range"),
         }

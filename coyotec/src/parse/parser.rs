@@ -189,7 +189,7 @@ impl Parser {
                     node.add_child(n);
                     continue;
                 }
-                TokenType::Else | TokenType::EndIf | TokenType::EndFor => {
+                TokenType::Else | TokenType::EndIf | TokenType::EndFor | TokenType::EndWhile => {
                     return Ok(node);
                 }
 
@@ -208,15 +208,41 @@ impl Parser {
                 TokenType::While => {
                     self.advance();
                     let mut while_node = Node::new(NodeType::While, self.current_token());
+
+                    let block = Node::new(NodeType::Block, self.current_token());
+                    while_node.add_child(block);
+
                     let mut conditional = Node::new(Conditional, self.current_token());
+                    // Start the scope block
 
                     // Get the condition  expression
                     let condition = self.parse_expr(0)?;
                     conditional.add_child(condition);
-                    // Add the logical condition to the IF node
+                    // Add the logical condition to the loop condition
                     while_node.add_child(conditional);
 
+                    // Parse all the statements inside the TRUE portion of the IF
+                    let code_block = Node::new(NodeType::CodeBlock, self.current_token());
+                    let res = self.parse_to_node(code_block);
+                    let code_block = match res {
+                        Err(e) => {
+                            println!("Error: {}", e);
+                            return Err(e);
+                        }
+                        Ok(b) => b,
+                    };
+                    while_node.add_child(code_block);
+
+                    // Close out the scope block
+                    let end_block = Node::new(NodeType::EndBlock, self.current_token());
+                    while_node.add_child(end_block);
+
+                    let end_while_node = Node::new(NodeType::EndWhile, self.current_token());
+                    while_node.add_child(end_while_node);
+
                     self.expect_token(TokenType::EndWhile)?;
+
+                    node.add_child(while_node);
                 }
 
                 TokenType::For => {
@@ -387,9 +413,13 @@ impl Parser {
                 let mut node = Node::new(Ident(varname), self.current_token());
                 // Check if this is an array
                 if self.match_token(TokenType::LBracket) {
+                    let mut element_node = Node::new(NodeType::ArrayElement, self.current_token());
                     if let Ok(index) = self.parse_expr(0) {
-                        node.add_child(index);
+                        element_node.add_child(index);
+                    } else {
+                        self.raise_error("Element index missing");
                     }
+                    node.add_child(element_node);
                     self.expect_token(RBracket)?;
                 }
 
@@ -464,7 +494,7 @@ impl Parser {
 
                 Assign => {
                     node.can_assign = true;
-                    (60, BinOp::Assign)
+                    (5, BinOp::Assign)
                 }
 
                 _ => break, // no operator, stop

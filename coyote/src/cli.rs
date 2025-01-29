@@ -106,7 +106,7 @@ fn repl<'a>() -> Result<()> {
                 parser.add_tokens(tokens, line);
 
                 if let Ok(node) = parser.parse() {
-                    //coyotec::ast::node::display_tree(&node);
+                    coyotec::ast::node::display_tree(&node);
 
                     // Generate the assembly code
                     generator.generate(&node);

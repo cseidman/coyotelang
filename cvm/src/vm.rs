@@ -196,14 +196,12 @@ impl Vm {
 
         macro_rules! vm_debug {
             () => {
-                println!("\nVM Debug");
-                println!("--------");
                 let ip = self.ip - 1;
                 let b = self.code[ip] as u8;
                 let instr = Instruction::from_u8(b);
                 print!("{:05}: {} ", self.ip, instr.as_str());
                 match instr {
-                    Push | Store | Load | Jmp | JmpFalse | Newarray | Set => {
+                    Push | Store | Load | Jmp | JmpFalse | Newarray | SPool | Set => {
                         let bytes: [u8; 8] =
                             self.code[self.ip + 1..self.ip + 9].try_into().unwrap();
                         let opd = f64::from_le_bytes(bytes) as usize;
@@ -219,6 +217,7 @@ impl Vm {
         loop {
             let b = self.get_instruction();
             //vm_debug!();
+            //sleep(Duration::from_millis(500));
             match b {
                 Push => {
                     let obj = self.get_const();
@@ -334,12 +333,12 @@ impl Vm {
                 }
 
                 // Get an element from an index
-                ALoad => {
-                    // Get the index
+                Index => {
+                    // Get the index expression
                     let index = self.pop().data.as_integer() as usize;
-                    // Get the array pointer
-                    let slot = self.get_operand();
-                    let obj = self.stack[slot as usize];
+
+                    // Get the array
+                    let obj = self.pop();
                     let ptr = obj.data.as_integer() as usize;
                     // Get the table itself
                     let Some(HeapValue::Table(table)) = self.heap.get(ptr) else {
@@ -361,6 +360,8 @@ impl Vm {
                 Or => {
                     boolop!(||);
                 }
+
+                Nop => {}
 
                 Print => {
                     self.print();

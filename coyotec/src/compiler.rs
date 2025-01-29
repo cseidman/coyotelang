@@ -22,7 +22,6 @@ pub fn compile(code: &str, source_type: SourceType) -> Result<Vec<u8>> {
         println!("{}", asm);
         // Assemble the assembly code into bytecode
         bytecode = assemble(&asm);
-        //println!("Bytecode: {:?}", bytecode);
     } else {
         bail!("Error parsing");
     }
