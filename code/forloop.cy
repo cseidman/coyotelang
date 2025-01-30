@@ -8,6 +8,9 @@ for i in 1 to 3
         if j == 14
             break
         endif
+        if j < 12
+            continue
+        endif
         print j
     endfor
 endfor

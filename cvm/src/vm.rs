@@ -19,13 +19,13 @@ struct StackFrame<'a> {
     sp: usize,
 }
 
-impl StackFrame {
+impl<'a> StackFrame<'a> {
     pub fn new(ip: usize, sp: usize) -> Self {
         Self { code: &[], ip, sp }
     }
 }
 
-pub struct Vm {
+pub struct Vm<'a> {
     stack: Vec<Object>,
     sp: usize,
     heap: Heap,
@@ -33,11 +33,11 @@ pub struct Vm {
     string_pool: Vec<String>,
     ip: usize,
 
-    stack_frame: Vec<StackFrame>,
+    stack_frame: Vec<StackFrame<'a>>,
     fp: usize,
 }
 
-impl Vm {
+impl<'a> Vm<'a> {
     pub fn new() -> Self {
         let obj = Object {
             tag: DataTag::Nil,
@@ -236,7 +236,9 @@ impl Vm {
                     self.push(obj)
                 }
 
-                Call => {}
+                Call => {
+                    self.pop_frame();
+                }
 
                 Add => {
                     binop!(+);
@@ -311,7 +313,7 @@ impl Vm {
                 AStore => {
                     // Array index
                     let array_location = self.get_operand();
-                    let mut array = self.stack[array_location as usize];
+                    let array = self.stack[array_location as usize];
                     // index
                     let idx = self.pop().data.as_integer() as usize;
                     // New value

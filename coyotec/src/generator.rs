@@ -52,6 +52,7 @@ impl Display for Instruction {
 struct LoopLocations {
     start_location: usize,
     exit_location: usize,
+    continue_location: usize,
     breaks: Vec<usize>,
     continue_breaks: Vec<usize>,
 }
@@ -61,6 +62,7 @@ impl LoopLocations {
         Self {
             start_location: 0,
             exit_location: 0,
+            continue_location: 0,
             breaks: Vec::new(),
             continue_breaks: Vec::new(),
         }
@@ -267,6 +269,15 @@ impl IrGenerator {
                 }
             }
 
+            NodeType::Continue => {
+                // Are we in a loop?
+                if self.loop_count > 0 {
+                    instr!("jmp", 0, "inner continue");
+                    let loc = get_instr_loc!();
+                    self.get_loop_locations().continue_breaks.push(loc);
+                }
+            }
+
             NodeType::Block => {
                 self.push_scope();
             }
@@ -307,6 +318,11 @@ impl IrGenerator {
                             self.instructions[instr_loc].code = format!("jmpfalse {};", cur_loc);
 
                             let breaks = self.get_loop_locations().clone().breaks;
+                            let continues = self.get_loop_locations().clone().continue_breaks;
+
+                            for i in continues {
+                                self.instructions[i].code = format!("jmp {}; # continue", loc);
+                            }
 
                             for i in breaks {
                                 self.instructions[i].code = format!("jmp {}; # break", cur_loc);
@@ -343,6 +359,10 @@ impl IrGenerator {
                             for ch in &child.children {
                                 self.generate_code(&ch);
                             }
+
+                            let continue_loc = self.current_location;
+                            self.get_loop_locations().continue_location = continue_loc;
+
                             instr!("load", iter_var_location, "Start incr");
                             instr!("push", 1);
                             instr!("add");
@@ -369,9 +389,14 @@ impl IrGenerator {
                             self.instructions[instr_loc].code = format!("jmpfalse {}", cur_loc);
 
                             let breaks = self.get_loop_locations().clone().breaks;
-
                             for i in breaks {
                                 self.instructions[i].code = format!("jmp {}; # break", cur_loc);
+                            }
+
+                            let loc = self.get_loop_locations().continue_location;
+                            let continues = self.get_loop_locations().clone().continue_breaks;
+                            for i in continues {
+                                self.instructions[i].code = format!("jmp {}; # continue", loc);
                             }
                         }
                         _ => {
