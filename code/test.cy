@@ -17,8 +17,10 @@ print x
 }
 print x+1
 print y
+z[1] = 500
+print z
 
-/*
+/*let
 10
 20
 30
@@ -29,4 +31,5 @@ print y
 14
 7
 42
+[10,500,30]
 */

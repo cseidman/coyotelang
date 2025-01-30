@@ -409,8 +409,8 @@ impl Parser {
             TokenType::Identifier(name) => {
                 self.advance();
 
-                let varname = Box::new(name.to_string());
-                let mut node = Node::new(Ident(varname), self.current_token());
+                let var_name = Box::new(name.to_string());
+                let mut node = Node::new(Ident(var_name), self.current_token());
                 // Check if this is an array
                 if self.match_token(TokenType::LBracket) {
                     let mut element_node = Node::new(NodeType::ArrayElement, self.current_token());

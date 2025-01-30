@@ -435,18 +435,28 @@ impl IrGenerator {
 
             NodeType::Ident(name) => {
                 let index = self.get_variable(&name);
-                if node.can_assign {
-                    instr!("store", index);
-                } else {
-                    instr!("load", index);
-                }
+                let mut is_array = false;
+                let can_assign = !node.can_assign;
+
                 for child in &node.children {
+                    is_array = true;
                     match child.node_type {
                         NodeType::ArrayElement => {
-                            self.generate_code(child);
-                            instr!("index");
+                            self.generate_code(child.children.first().unwrap());
+                            if node.can_assign {
+                                instr!("astore", index);
+                            } else {
+                                instr!("index");
+                            }
                         }
                         _ => {}
+                    }
+                }
+                if !is_array {
+                    if node.can_assign {
+                        instr!("store", index);
+                    } else {
+                        instr!("load", index);
                     }
                 }
             }

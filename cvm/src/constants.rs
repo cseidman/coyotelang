@@ -40,10 +40,12 @@ pub enum Instruction {
     For = 32,
     While = 33,
     Nop = 34,
+
+    Call = 35,
 }
 
 impl Instruction {
-    pub const INSTRUCTIONS: [&'static str; 35] = [
+    pub const INSTRUCTIONS: [&'static str; 36] = [
         "halt",     // 0
         "push",     // 1
         "add",      // 2
@@ -79,6 +81,7 @@ impl Instruction {
         "for",      // 32
         "while",    // 33
         "nop",      // 34
+        "call",     // 35
     ];
 
     /// Return the human-readable name of this instruction.
@@ -126,6 +129,7 @@ impl Instruction {
             33 => Instruction::While,
 
             34 => Instruction::Nop,
+            35 => Instruction::Call,
             _ => {
                 panic!("Unknown opcode {}", opcode);
             }

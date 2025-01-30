@@ -13,14 +13,15 @@ use crate::{
 use std::ops::Neg;
 use std::usize;
 
-struct StackFrame {
+struct StackFrame<'a> {
+    code: &'a [Object],
     ip: usize,
     sp: usize,
 }
 
 impl StackFrame {
     pub fn new(ip: usize, sp: usize) -> Self {
-        Self { ip, sp }
+        Self { code: &[], ip, sp }
     }
 }
 
@@ -235,6 +236,8 @@ impl Vm {
                     self.push(obj)
                 }
 
+                Call => {}
+
                 Add => {
                     binop!(+);
                 }
@@ -303,6 +306,22 @@ impl Vm {
                         data: value,
                     };
                     self.push(object);
+                }
+
+                AStore => {
+                    // Array index
+                    let array_location = self.get_operand();
+                    let mut array = self.stack[array_location as usize];
+                    // index
+                    let idx = self.pop().data.as_integer() as usize;
+                    // New value
+                    let value = self.pop();
+                    let heap_location = array.data.as_ptr();
+                    if let Some(table) = self.heap.get_mut(heap_location) {
+                        if let HeapValue::Table(arr) = table {
+                            arr.set(idx, value)
+                        }
+                    }
                 }
 
                 Store => {
