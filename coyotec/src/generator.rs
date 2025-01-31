@@ -471,18 +471,20 @@ impl IrGenerator {
                             if node.can_assign {
                                 instr!("astore", index);
                             } else {
-                                instr!("index");
+                                instr!("index", index);
                             }
                         }
                         _ => {}
                     }
                 }
-                if !is_array {
-                    if node.can_assign {
-                        instr!("store", index);
-                    } else {
-                        instr!("load", index);
-                    }
+                if is_array {
+                    return;
+                }
+
+                if node.can_assign {
+                    instr!("store", index);
+                } else {
+                    instr!("load", index);
                 }
             }
             // We don't need to capture the internal elements here because we're drilling

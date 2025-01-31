@@ -2,7 +2,7 @@
 use std::collections::BTreeMap;
 use std::fmt::Display;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Table<T: Display> {
     array: Vec<T>,
     array_length: usize,

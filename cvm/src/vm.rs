@@ -2,17 +2,18 @@
 
 const STACK_SIZE: usize = 1_000_000;
 const GLOBAL_SIZE: usize = 1024;
+const FRAMES_DEPTH: usize = 1024;
 
 use crate::ctable::Table;
-use crate::heap::{Heap, HeapValue};
 use crate::{
     constants::Instruction,
     constants::Instruction::*,
-    valuetypes::{DataTag, Object, Value},
+    valuetypes::{DataTag, Object},
 };
+use std::cmp::{Ordering, PartialOrd};
 use std::ops::Neg;
 use std::usize;
-
+#[derive(Debug, Clone)]
 struct StackFrame<'a> {
     code: &'a [Object],
     ip: usize,
@@ -24,11 +25,10 @@ impl<'a> StackFrame<'a> {
         Self { code: &[], ip, sp }
     }
 }
-
+#[derive(Debug, Clone)]
 pub struct Vm<'a> {
     stack: Vec<Object>,
     sp: usize,
-    heap: Heap,
     pub code: Vec<u8>,
     string_pool: Vec<String>,
     ip: usize,
@@ -39,20 +39,16 @@ pub struct Vm<'a> {
 
 impl<'a> Vm<'a> {
     pub fn new() -> Self {
-        let obj = Object {
-            tag: DataTag::Nil,
-            data: Value { byte: 0 },
-        };
+        let obj = Object::Nil;
 
         Self {
             stack: vec![obj; STACK_SIZE],
             sp: GLOBAL_SIZE,
             code: Vec::new(),
-            heap: Heap::new(),
             string_pool: Vec::new(),
             ip: 0,
 
-            stack_frame: vec![],
+            stack_frame: Vec::with_capacity(FRAMES_DEPTH),
             fp: 0,
         }
     }
@@ -61,6 +57,12 @@ impl<'a> Vm<'a> {
         let tag = DataTag::from(self.code[self.ip]);
         self.ip += 1;
         tag
+    }
+
+    fn get_data(&mut self) -> usize {
+        let bytes: [u8; 8] = self.code[self.ip..self.ip + 8].try_into().unwrap();
+        self.ip += 8;
+        f64::from_le_bytes(bytes) as usize
     }
 
     fn push_frame(&mut self) {
@@ -84,13 +86,6 @@ impl<'a> Vm<'a> {
         let byte = self.code[ip];
         self.ip += 1;
         Instruction::from_u8(byte)
-    }
-
-    fn get_data(&mut self) -> Value {
-        let ip = self.ip;
-        let bytes: [u8; 8] = self.code[ip..ip + 8].try_into().unwrap();
-        self.ip += 8;
-        Value { bytes }
     }
 
     fn get_operand(&mut self) -> usize {
@@ -117,7 +112,8 @@ impl<'a> Vm<'a> {
 
     fn pop(&mut self) -> Object {
         self.sp -= 1;
-        self.stack[self.sp]
+        let sp = self.sp;
+        self.stack[sp].clone()
     }
 
     fn push(&mut self, obj: Object) {
@@ -125,11 +121,35 @@ impl<'a> Vm<'a> {
         self.sp += 1;
     }
 
-    /// Gets the value that exists following the `const` instruction
     fn get_const(&mut self) -> Object {
-        Object {
-            tag: self.get_tag(),
-            data: self.get_data(),
+        let tag = self.get_tag();
+        let bytes: [u8; 8] = self.code[self.ip..self.ip + 8].try_into().unwrap();
+        self.ip += 8;
+
+        match tag {
+            DataTag::Nil => Object::Nil,
+            DataTag::Float => Object::Float(f64::from_le_bytes(bytes)),
+            DataTag::Bool => Object::Bool(i64::from_le_bytes(bytes) != 0),
+            DataTag::Integer => Object::Integer(f64::from_le_bytes(bytes) as i64),
+            DataTag::Text => {
+                let index = i64::from_le_bytes(bytes) as usize;
+                let txt = self.string_pool[index].clone();
+                Object::Str(txt)
+            }
+            _ => {
+                panic!("Invalid constant tag: {:?}", tag);
+            }
+        }
+    }
+
+    fn get_string(&mut self) -> Object {
+        let tag = self.get_tag();
+        let index = self.get_data();
+        let value = self.string_pool[index].clone();
+
+        match tag {
+            DataTag::Text => return Object::Str(value),
+            _ => panic!("invalid constant tag"),
         }
     }
 
@@ -182,16 +202,24 @@ impl<'a> Vm<'a> {
                 let right = self.pop();
                 let val = left $op right;
 
-                self.push(Object::new(DataTag::Bool, Value { b: val }));
+                self.push(Object::Bool(val));
             };
         }
 
         macro_rules! boolop {
             ($op:tt) => {
-                let right = self.pop();
-                let left = self.pop();
-                let val = left.data.as_bool() $op right.data.as_bool();
-                self.push(Object::new(DataTag::Bool, Value { b: val }));
+                let right = if let Object::Bool(right_bool) = self.pop() {
+                    right_bool
+                } else {
+                    panic!("not boolean")
+                };
+                let left = if let Object::Bool(left_bool) = self.pop() {
+                    left_bool
+                } else {
+                    panic!("not boolean")
+                };
+                let val = left $op right;
+                self.push(Object::Bool(val));
             };
         }
 
@@ -226,17 +254,15 @@ impl<'a> Vm<'a> {
                 }
 
                 SPool => {
-                    // Get the index in the string pool
-                    let pool_value = self.get_const();
-                    // Create an object with the same index but with the correct data type
-                    let obj = Object {
-                        tag: DataTag::ConstText,
-                        data: pool_value.data,
-                    };
+                    let obj = self.get_const();
                     self.push(obj)
                 }
 
                 Call => {
+                    self.push_frame();
+                }
+
+                Return => {
                     self.pop_frame();
                 }
 
@@ -300,36 +326,38 @@ impl<'a> Vm<'a> {
                         arr.push(obj)
                     }
 
-                    let heap_index = self.heap.store(HeapValue::Table(arr));
-                    let value = Value { ptr: heap_index };
+                    let obj = Object::Array(Box::new(arr));
 
-                    let object = Object {
-                        tag: DataTag::Array,
-                        data: value,
-                    };
-                    self.push(object);
+                    self.push(obj);
                 }
 
                 AStore => {
-                    // Array index
+                    // Get the element index
+                    let idx = if let Object::Integer(int) = &self.pop() {
+                        *int as usize
+                    } else {
+                        panic!("not an integer");
+                    };
+                    // Get the new value
+                    let value = self.pop().clone();
+
+                    // Index array object
                     let array_location = self.get_operand();
-                    let array = self.stack[array_location as usize];
-                    // index
-                    let idx = self.pop().data.as_integer() as usize;
-                    // New value
-                    let value = self.pop();
-                    let heap_location = array.data.as_ptr();
-                    if let Some(table) = self.heap.get_mut(heap_location) {
-                        if let HeapValue::Table(arr) = table {
-                            arr.set(idx, value)
-                        }
-                    }
+                    let obj_array = self.stack.get_mut(array_location as usize).unwrap();
+                    let array: &mut Box<Table<Object>> = if let Object::Array(table) = obj_array {
+                        table
+                    } else {
+                        panic!("not an array");
+                    };
+
+                    array.set(idx, value);
+                    //self.stack[array_location as usize]
                 }
 
                 Store => {
                     let slot = self.get_integer();
                     let obj = self.pop();
-                    match obj.tag {
+                    match obj {
                         _ => {
                             self.stack[slot as usize] = obj;
                         }
@@ -338,7 +366,7 @@ impl<'a> Vm<'a> {
 
                 Load => {
                     let slot = self.get_operand();
-                    let obj = self.stack[slot];
+                    let obj = self.stack[slot].clone();
                     self.push(obj);
                 }
                 Jmp => {
@@ -348,32 +376,36 @@ impl<'a> Vm<'a> {
                 JmpFalse => {
                     let new_loc = self.get_operand();
                     let obj = self.pop();
-                    if !obj.data.as_bool() {
-                        self.ip = new_loc;
+                    if let Object::Bool(b) = obj {
+                        if !b {
+                            self.ip = new_loc;
+                        }
                     }
                 }
 
                 // Get an element from an index
                 Index => {
                     // Get the index expression
-                    let index = self.pop().data.as_integer() as usize;
+                    // index
+                    let index = if let Object::Integer(int) = self.pop() {
+                        int as usize
+                    } else {
+                        panic!("not an integer");
+                    };
 
                     // Get the array
-                    let obj = self.pop();
-                    let ptr = obj.data.as_integer() as usize;
-                    // Get the table itself
-                    let Some(HeapValue::Table(table)) = self.heap.get(ptr) else {
-                        eprintln!("no array located at {}", ptr);
-                        return;
-                    };
+                    let slot = self.get_operand();
+                    let obj = self.stack[slot].clone();
 
-                    // Get the Object in the given location
-                    let Some(&obj) = table.get(index) else {
-                        eprintln!("no value located at index {}", index);
-                        return;
-                    };
-
-                    self.push(obj);
+                    if let Object::Array(table) = obj {
+                        // Get the Object in the given location
+                        if let Some(obj) = table.get(index as usize) {
+                            self.push(obj.clone());
+                        } else {
+                            eprintln!("no value located at index {}", index);
+                            return;
+                        };
+                    }
                 }
                 And => {
                     boolop!(&&);
@@ -408,22 +440,7 @@ impl<'a> Vm<'a> {
 
     fn print(&mut self) {
         let value = self.pop();
-        match value.tag {
-            DataTag::ConstText => {
-                let index = value.data.as_text();
-                let text = &self.string_pool[index];
-                println!("{}", text);
-            }
-            DataTag::Array => {
-                let ptr = value.data.as_ptr();
-                if let Some(arr) = self.heap.get(ptr) {
-                    if let HeapValue::Table(table) = arr {
-                        println!("{}", table);
-                    }
-                }
-            }
-            _ => println!("{}", value),
-        }
+        println!("{}", value);
     }
 }
 
