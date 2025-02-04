@@ -116,7 +116,7 @@ fn repl<'a>() -> Result<()> {
                     println!("{}", asm);
                     // Assemble the assembly code into bytecode
                     let bytecode = assemble(&asm);
-                    vm.code = bytecode;
+                    vm.add_code(bytecode);
                     //println!("{:?}", &vm.code);
                     vm.run()
                 } else {

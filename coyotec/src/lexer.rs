@@ -188,6 +188,9 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
                 "endfor" => lexer.make_token(TokenType::EndFor),
                 "break" => lexer.make_token(TokenType::Break),
                 "continue" => lexer.make_token(TokenType::Continue),
+
+                "module" => lexer.make_token(TokenType::Module),
+                "use" => lexer.make_token(TokenType::Use),
                 // And if all else fails: identifier
                 _ => lexer.make_token(TokenType::Identifier(ident)),
             };

@@ -107,6 +107,8 @@ pub enum TokenType {
     EndWhile,
     Break,
     Continue,
+    Module,
+    Use,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct Location {

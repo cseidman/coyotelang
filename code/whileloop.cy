@@ -1,12 +1,6 @@
 let x = 1
-while x < 20
-    x = x + 1
-    if x < 5
-        continue
-    endif
+while x < 5
     print x
-    if x > 10
-        break
-    endif
+    x = x+1
 endwhile
 print "Done!"

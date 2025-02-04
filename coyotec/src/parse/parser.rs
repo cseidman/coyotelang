@@ -172,6 +172,16 @@ impl Parser {
                     continue;
                 }
 
+                Module => {
+                    self.advance();
+                    // todo: load module
+                }
+
+                Use => {
+                    self.advance();
+                    // todo:
+                }
+
                 Newline | EOF => {
                     self.advance();
                     continue;

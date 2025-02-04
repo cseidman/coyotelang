@@ -19,8 +19,11 @@ print x+1
 print y
 z[1] = 500
 print z
+let neg = -(15 + 3)
+print neg
+print "Done!"
 
-/*let
+/*
 10
 20
 30
@@ -32,4 +35,6 @@ print z
 7
 42
 [10,500,30]
+-18
+Done!
 */

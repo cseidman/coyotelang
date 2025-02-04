@@ -2,7 +2,7 @@
 
 use crate::cfunction::Func;
 use crate::ctable::Table;
-use std::cmp::{Ordering, PartialEq};
+use std::cmp::PartialEq;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
@@ -62,7 +62,7 @@ impl Add for Object {
 
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (Object::Nil, rhs) => Object::Nil,
+            (Object::Nil, Object::Nil) => Object::Nil,
             (Object::Integer(lhs), Object::Integer(rhs)) => Object::Integer(lhs + rhs),
             (Object::Float(lhs), Object::Float(rhs)) => Object::Float(lhs + rhs),
             (Object::Float(lhs), Object::Integer(rhs)) => Object::Float(lhs + rhs as f64),
@@ -77,7 +77,7 @@ impl Sub for Object {
 
     fn sub(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (Object::Nil, rhs) => Object::Nil,
+            (Object::Nil, Object::Nil) => Object::Nil,
             (Object::Integer(lhs), Object::Integer(rhs)) => Object::Integer(lhs - rhs),
             (Object::Float(lhs), Object::Float(rhs)) => Object::Float(lhs - rhs),
             (Object::Float(lhs), Object::Integer(rhs)) => Object::Float(lhs - rhs as f64),
@@ -92,7 +92,7 @@ impl Mul for Object {
 
     fn mul(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (Object::Nil, rhs) => Object::Nil,
+            (Object::Nil, Object::Nil) => Object::Nil,
             (Object::Integer(lhs), Object::Integer(rhs)) => Object::Integer(lhs * rhs),
             (Object::Float(lhs), Object::Float(rhs)) => Object::Float(lhs * rhs),
             (Object::Float(lhs), Object::Integer(rhs)) => Object::Float(lhs * rhs as f64),
@@ -106,7 +106,7 @@ impl Div for Object {
     type Output = Object;
     fn div(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (Object::Nil, rhs) => Object::Nil,
+            (Object::Nil, Object::Nil) => Object::Nil,
             (Object::Integer(lhs), Object::Integer(rhs)) => Object::Integer(lhs / rhs),
             (Object::Float(lhs), Object::Float(rhs)) => Object::Float(lhs / rhs),
             (Object::Float(lhs), Object::Integer(rhs)) => Object::Float(lhs / rhs as f64),
@@ -120,7 +120,12 @@ impl Neg for Object {
     type Output = Object;
 
     fn neg(self) -> Self::Output {
-        todo!()
+        match self {
+            Object::Integer(i) => Object::Integer(-i),
+            Object::Float(f) => Object::Float(-f),
+            Object::Bool(b) => Object::Bool(!b),
+            _ => panic!("Cannot negate type"),
+        }
     }
 }
 

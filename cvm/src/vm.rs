@@ -4,127 +4,163 @@ const STACK_SIZE: usize = 1_000_000;
 const GLOBAL_SIZE: usize = 1024;
 const FRAMES_DEPTH: usize = 1024;
 
+use crate::cfunction::Func;
 use crate::ctable::Table;
 use crate::{
     constants::Instruction,
     constants::Instruction::*,
     valuetypes::{DataTag, Object},
 };
-use std::cmp::{Ordering, PartialOrd};
 use std::ops::Neg;
 use std::usize;
+
 #[derive(Debug, Clone)]
-struct StackFrame<'a> {
-    code: &'a [Object],
+struct StackFrame {
+    function: Func,
     ip: usize,
+    start_sp: usize,
     sp: usize,
 }
 
-impl<'a> StackFrame<'a> {
-    pub fn new(ip: usize, sp: usize) -> Self {
-        Self { code: &[], ip, sp }
+impl StackFrame {
+    pub fn new(function: Func, ip: usize, sp: usize) -> Self {
+        Self {
+            function,
+            ip,
+            start_sp: sp,
+            sp,
+        }
     }
 }
-#[derive(Debug, Clone)]
-pub struct Vm<'a> {
-    stack: Vec<Object>,
-    sp: usize,
-    pub code: Vec<u8>,
-    string_pool: Vec<String>,
-    ip: usize,
 
-    stack_frame: Vec<StackFrame<'a>>,
+#[derive(Debug, Clone)]
+pub struct Vm {
+    stack: Vec<Object>,
+    string_pool: Vec<String>,
+    stack_frame: Vec<StackFrame>,
     fp: usize,
 }
 
-impl<'a> Vm<'a> {
+impl Vm {
     pub fn new() -> Self {
         let obj = Object::Nil;
 
-        Self {
-            stack: vec![obj; STACK_SIZE],
-            sp: GLOBAL_SIZE,
-            code: Vec::new(),
+        let mut s = Self {
+            stack: vec![obj.clone(); STACK_SIZE],
             string_pool: Vec::new(),
-            ip: 0,
 
             stack_frame: Vec::with_capacity(FRAMES_DEPTH),
             fp: 0,
-        }
+        };
+        s.push_frame(Func::main_func());
+        s
+    }
+
+    pub fn current_stack(&mut self) -> &mut [Object] {
+        let start_sp = self.current_frame().start_sp;
+        &mut self.stack[start_sp..]
+    }
+
+    pub fn add_code(&mut self, code: Vec<u8>) {
+        self.current_frame().function.code = code;
+    }
+
+    fn current_frame(&mut self) -> &mut StackFrame {
+        let fp = self.fp;
+        &mut self.stack_frame[fp]
+    }
+
+    fn incr_ip(&mut self, by: usize) {
+        let fp = self.fp;
+        self.stack_frame[fp].ip += by;
+    }
+
+    fn current_code(&mut self) -> &[u8] {
+        &self.current_frame().function.code
     }
 
     fn get_tag(&mut self) -> DataTag {
-        let tag = DataTag::from(self.code[self.ip]);
-        self.ip += 1;
+        let ip = self.current_frame().ip;
+        let code = self.current_code()[ip];
+        let tag = DataTag::from(code);
+        self.incr_ip(1);
         tag
     }
 
     fn get_data(&mut self) -> usize {
-        let bytes: [u8; 8] = self.code[self.ip..self.ip + 8].try_into().unwrap();
-        self.ip += 8;
+        let ip = self.current_frame().ip;
+        let bytes: [u8; 8] = self.current_code()[ip..ip + 8].try_into().unwrap();
+        self.incr_ip(8);
         f64::from_le_bytes(bytes) as usize
     }
 
-    fn push_frame(&mut self) {
-        let frame = StackFrame::new(self.ip, self.sp);
+    fn push_frame(&mut self, function: Func) {
+        // Push the current ip and sp
+        let ip = 0;
+        let sp = 0;
+
+        if self.fp > 0 {
+            let sp = self.current_frame().sp;
+            let ip = self.current_frame().ip;
+        }
+
+        let mut frame = StackFrame::new(function, ip, sp);
         self.stack_frame.push(frame);
-        self.ip = 0;
-        self.sp += 1;
-        self.fp += 1;
     }
 
     fn pop_frame(&mut self) {
-        if let Some(frame) = self.stack_frame.pop() {
-            self.ip = frame.ip;
-            self.sp = frame.sp;
-            self.sp -= 1;
-        }
+        self.stack_frame.pop();
     }
 
     fn get_instruction(&mut self) -> Instruction {
-        let ip = self.ip;
-        let byte = self.code[ip];
-        self.ip += 1;
+        let ip = self.current_frame().ip;
+        let byte = self.current_code()[ip];
+        self.incr_ip(1);
         Instruction::from_u8(byte)
     }
 
     fn get_operand(&mut self) -> usize {
-        self.ip += 1;
-        let bytes: [u8; 8] = self.code[self.ip..self.ip + 8].try_into().unwrap();
+        self.incr_ip(1);
+        let ip = self.current_frame().ip;
+        let bytes: [u8; 8] = self.current_code()[ip..ip + 8].try_into().unwrap();
 
-        self.ip += 8;
+        self.incr_ip(8);
         f64::from_le_bytes(bytes) as usize
     }
 
     fn get_integer(&mut self) -> usize {
-        self.ip += 1;
-        let bytes: [u8; 8] = self.code[self.ip..self.ip + 8].try_into().unwrap();
+        self.incr_ip(1);
+        let ip = self.current_frame().ip;
+        let bytes: [u8; 8] = self.current_code()[ip..ip + 8].try_into().unwrap();
 
-        self.ip += 8;
+        self.incr_ip(8);
         f64::from_le_bytes(bytes) as usize
     }
 
     fn get_byte(&mut self) -> u8 {
-        let byte = self.code[self.ip];
-        self.ip += 8;
+        let ip = self.current_frame().ip;
+        let byte = self.current_code()[ip];
+        self.incr_ip(8);
         byte
     }
 
     fn pop(&mut self) -> Object {
-        self.sp -= 1;
-        let sp = self.sp;
-        self.stack[sp].clone()
+        self.current_frame().sp -= 1;
+        let sp = self.current_frame().sp;
+        self.current_stack()[sp].clone()
     }
 
     fn push(&mut self, obj: Object) {
-        self.stack[self.sp] = obj;
-        self.sp += 1;
+        let sp = self.current_frame().sp;
+        self.current_stack()[sp] = obj;
+        self.current_frame().sp += 1;
     }
 
     fn get_const(&mut self) -> Object {
         let tag = self.get_tag();
-        let bytes: [u8; 8] = self.code[self.ip..self.ip + 8].try_into().unwrap();
-        self.ip += 8;
+        let ip = self.current_frame().ip;
+        let bytes: [u8; 8] = self.current_code()[ip..ip + 8].try_into().unwrap();
+        self.incr_ip(8);
 
         match tag {
             DataTag::Nil => Object::Nil,
@@ -132,7 +168,7 @@ impl<'a> Vm<'a> {
             DataTag::Bool => Object::Bool(i64::from_le_bytes(bytes) != 0),
             DataTag::Integer => Object::Integer(f64::from_le_bytes(bytes) as i64),
             DataTag::Text => {
-                let index = i64::from_le_bytes(bytes) as usize;
+                let index = f64::from_le_bytes(bytes) as usize;
                 let txt = self.string_pool[index].clone();
                 Object::Str(txt)
             }
@@ -143,48 +179,47 @@ impl<'a> Vm<'a> {
     }
 
     fn get_string(&mut self) -> Object {
-        let tag = self.get_tag();
+        self.get_tag();
         let index = self.get_data();
         let value = self.string_pool[index].clone();
-
-        match tag {
-            DataTag::Text => return Object::Str(value),
-            _ => panic!("invalid constant tag"),
-        }
+        Object::Str(value)
     }
 
     /// Loads constants from the ASM file that need to go into the string pool
     fn load_string_pool(&mut self) {
         self.string_pool.clear();
-        let num_constants = u32::from_le_bytes(self.code[0..4].try_into().unwrap());
-        self.ip += 4;
+        let num_constants = u32::from_le_bytes(self.current_code()[0..4].try_into().unwrap());
+        self.incr_ip(4);
         for _ in 0..num_constants {
+            let ip = self.current_frame().ip;
             let s_len =
-                u32::from_le_bytes(self.code[self.ip..self.ip + 4].try_into().unwrap()) as usize;
-            self.ip += 4;
-            let s_val = String::from_utf8(self.code[self.ip..self.ip + s_len].to_vec()).unwrap();
+                u32::from_le_bytes(self.current_code()[ip..ip + 4].try_into().unwrap()) as usize;
+            self.incr_ip(4);
+            let ip = self.current_frame().ip;
+            let s_val = String::from_utf8(self.current_code()[ip..ip + s_len].to_vec()).unwrap();
             self.string_pool.push(s_val);
-            self.ip += s_len;
+            self.incr_ip(s_len);
         }
     }
 
     /// Read the number of constants and use that as the basis for the starting position on the
     /// stack
     fn load_globals(&mut self) -> usize {
-        let start = self.ip;
-        let num_constants = u32::from_le_bytes(self.code[start..(start + 4)].try_into().unwrap());
-        self.ip += 4;
+        let start = self.current_frame().ip;
+        let num_constants =
+            u32::from_le_bytes(self.current_code()[start..(start + 4)].try_into().unwrap());
+        self.incr_ip(4);
         num_constants as usize
     }
 
     pub fn run(&mut self) {
-        self.ip = 0;
-
         self.load_string_pool();
         self.load_globals();
         // Clear out the bytes we already used and restart at 0
-        self.code.drain(..self.ip);
-        self.ip = 0;
+        let ip = self.current_frame().ip;
+        self.current_frame().function.code.drain(..ip);
+        self.current_frame().ip = 0;
+        self.current_frame().sp = 1024;
 
         macro_rules! binop {
             ($op:tt) => {
@@ -225,27 +260,49 @@ impl<'a> Vm<'a> {
 
         macro_rules! vm_debug {
             () => {
-                let ip = self.ip - 1;
-                let b = self.code[ip] as u8;
+                let mut ip = self.current_frame().ip;
+                let b = self.current_code()[ip] as u8;
                 let instr = Instruction::from_u8(b);
-                print!("{:05}: {} ", self.ip, instr.as_str());
+                print!("{:05}: {:<10} ", ip, instr.as_str());
                 match instr {
-                    Push | Store | Load | Jmp | JmpFalse | Newarray | SPool | Set => {
-                        let bytes: [u8; 8] =
-                            self.code[self.ip + 1..self.ip + 9].try_into().unwrap();
+                    Push | Store | Load | Jmp | Newarray | SPool | Set | Index => {
+                        ip = ip + 2;
+                        let bytes: [u8; 8] = self.current_code()[ip..ip + 8].try_into().unwrap();
+                        //print!("bytes: {:?}", bytes);
                         let opd = f64::from_le_bytes(bytes) as usize;
-                        println!("{opd}");
+                        print!("{:<6} |", opd);
+                    }
+                    JmpFalse => {
+                        ip = ip + 2;
+                        let bytes: [u8; 8] = self.current_code()[ip..ip + 8].try_into().unwrap();
+                        let opd = f64::from_le_bytes(bytes) as usize;
+                        print!("{:<6} |", opd);
                     }
                     _ => {
-                        println!();
+                        print!("{:<6} |", "");
                     }
                 }
             };
         }
 
+        macro_rules! display_stack {
+            () => {
+                print!(" -> [ ");
+                for sp in 0..10 {
+                    //let obj = self.stack[sp].clone();
+                    let obj = self.current_stack()[sp].clone();
+                    if obj != Object::Nil {
+                        print!("{obj} ")
+                    }
+                }
+                println!("]");
+            };
+        }
+
         loop {
-            let b = self.get_instruction();
             //vm_debug!();
+            let b = self.get_instruction();
+
             //sleep(Duration::from_millis(500));
             match b {
                 Push => {
@@ -254,12 +311,24 @@ impl<'a> Vm<'a> {
                 }
 
                 SPool => {
-                    let obj = self.get_const();
+                    let obj = self.get_string();
                     self.push(obj)
                 }
 
                 Call => {
-                    self.push_frame();
+                    // Get the function object off the stack
+                    let func_obj = self.pop();
+                    let func = if let Object::Func(func_obj) = func_obj {
+                        self.push_frame(*func_obj);
+                    } else {
+                        panic!("Not a function");
+                    };
+
+                    // Position the pointer where the parameters were left on the stack
+                    let fp = self.fp;
+                    //self.stack_frame[fp].sp -= func.arity;
+
+                    self.pop_frame();
                 }
 
                 Return => {
@@ -308,7 +377,7 @@ impl<'a> Vm<'a> {
 
                 Set => {
                     let slot = self.get_operand();
-                    self.stack[slot as usize] = self.pop();
+                    self.current_stack()[slot as usize] = self.pop();
                 }
 
                 Neg => {
@@ -333,8 +402,8 @@ impl<'a> Vm<'a> {
 
                 AStore => {
                     // Get the element index
-                    let idx = if let Object::Integer(int) = &self.pop() {
-                        *int as usize
+                    let idx = if let Object::Integer(int) = self.pop() {
+                        int as usize
                     } else {
                         panic!("not an integer");
                     };
@@ -343,12 +412,16 @@ impl<'a> Vm<'a> {
 
                     // Index array object
                     let array_location = self.get_operand();
-                    let obj_array = self.stack.get_mut(array_location as usize).unwrap();
-                    let array: &mut Box<Table<Object>> = if let Object::Array(table) = obj_array {
-                        table
-                    } else {
-                        panic!("not an array");
-                    };
+                    let obj_array = self
+                        .current_stack()
+                        .get_mut(array_location as usize)
+                        .unwrap();
+                    let array: &mut Box<Table<Object>> =
+                        if let Object::Array(ref mut table) = obj_array {
+                            table
+                        } else {
+                            panic!("not an array");
+                        };
 
                     array.set(idx, value);
                     //self.stack[array_location as usize]
@@ -359,26 +432,26 @@ impl<'a> Vm<'a> {
                     let obj = self.pop();
                     match obj {
                         _ => {
-                            self.stack[slot as usize] = obj;
+                            self.current_stack()[slot as usize] = obj;
                         }
                     }
                 }
 
                 Load => {
-                    let slot = self.get_operand();
-                    let obj = self.stack[slot].clone();
+                    let slot = self.get_integer();
+                    let obj = self.current_stack()[slot].clone();
                     self.push(obj);
                 }
                 Jmp => {
                     let new_loc = self.get_operand();
-                    self.ip = new_loc;
+                    self.current_frame().ip = new_loc;
                 }
                 JmpFalse => {
                     let new_loc = self.get_operand();
                     let obj = self.pop();
                     if let Object::Bool(b) = obj {
                         if !b {
-                            self.ip = new_loc;
+                            self.current_frame().ip = new_loc;
                         }
                     }
                 }
@@ -395,7 +468,7 @@ impl<'a> Vm<'a> {
 
                     // Get the array
                     let slot = self.get_operand();
-                    let obj = self.stack[slot].clone();
+                    let obj = self.current_stack()[slot].clone();
 
                     if let Object::Array(table) = obj {
                         // Get the Object in the given location
@@ -428,14 +501,9 @@ impl<'a> Vm<'a> {
                     break;
                 }
             }
-
-            //for i in ((sp + 16)..(starting_sp + 26)) {
-            //    print!("[{}] ", self.stack[i]);
-            //}
-            //println!();
+            //display_stack!();
         }
-
-        //println!("{}", self.registers[0].as_integer());
+        println!();
     }
 
     fn print(&mut self) {
@@ -446,6 +514,6 @@ impl<'a> Vm<'a> {
 
 pub fn execute(bytecode: Vec<u8>) {
     let mut vm = Vm::new();
-    vm.code = bytecode;
+    vm.add_code(bytecode);
     vm.run();
 }
