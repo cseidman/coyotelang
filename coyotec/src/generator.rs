@@ -443,6 +443,8 @@ impl IrGenerator {
                             }
                             if index == 0 {
                                 instr!("halt");
+                            } else {
+                                instr!("return");
                             }
                         }
                         _ => {

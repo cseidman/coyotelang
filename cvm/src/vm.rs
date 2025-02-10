@@ -26,11 +26,11 @@ struct StackFrame {
 }
 
 impl StackFrame {
-    pub fn new(function: Func, ip: usize, sp: usize) -> Self {
+    pub fn new(function: Func, ip: usize, sp: usize, start: usize) -> Self {
         Self {
             function,
             ip,
-            start_sp: sp,
+            start_sp: start,
             sp,
         }
     }
@@ -55,7 +55,7 @@ impl Vm {
             stack_frame: Vec::with_capacity(FRAMES_DEPTH),
         };
 
-        let frame = StackFrame::new(Func::new(), 0, 0);
+        let frame = StackFrame::new(Func::new(), 0, 0, 0);
         vm.stack_frame.push(frame);
         vm
     }
@@ -102,11 +102,11 @@ impl Vm {
         let mut sp = 0;
 
         if self.stack_frame.len() > 1 {
-            sp = self.current_frame().sp - function.arity as usize;
-            ip = self.current_frame().ip;
+            sp = self.current_frame().sp;
+            //ip = self.current_frame().ip;
         }
-
-        let frame = StackFrame::new(function, ip, sp);
+        let start = sp - function.arity as usize;
+        let frame = StackFrame::new(function, ip, sp, start);
         self.stack_frame.push(frame);
     }
 
@@ -400,7 +400,7 @@ impl Vm {
         }
 
         loop {
-            //vm_debug!();
+            vm_debug!();
             let b = self.get_instruction();
 
             sleep(Duration::from_millis(100));
@@ -602,7 +602,7 @@ impl Vm {
             }
             println!("------------");
             */
-            //display_stack!();
+            display_stack!();
         }
         println!();
     }
