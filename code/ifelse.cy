@@ -1,7 +1,7 @@
-if 6 ==7 or 1==2
+if 6==7 or 1==2
     print "Okay"
 else
-    if 3 == 4
+    if true
         print "never mind"
     else
         print "cool"

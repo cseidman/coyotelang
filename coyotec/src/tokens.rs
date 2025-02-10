@@ -90,6 +90,7 @@ pub enum TokenType {
     Identifier(String),
     Let,
     Func,
+    EndFunc,
     Print,
     EOF,
     If,
@@ -109,6 +110,9 @@ pub enum TokenType {
     Continue,
     Module,
     Use,
+    Return,
+    True,
+    False,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct Location {

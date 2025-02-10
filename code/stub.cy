@@ -1,6 +1,4 @@
-let x = 1
-while x < 5
-    print x
-    x = x+1
-endwhile
-print "Done"
+let x = 3
+for i in 1 to x
+    print i
+endfor

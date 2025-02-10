@@ -1,4 +1,4 @@
-use crate::constants::Instruction;
+#![allow(dead_code)]
 
 /// ## How the module system works
 /// There are two ways to load modules:
@@ -14,17 +14,17 @@ pub struct Module {
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Func {
-    pub arity: usize,
+    pub arity: u8,
+    pub slots: u8,
     pub code: Vec<u8>,
-    pub name: String,
 }
 
 impl Func {
-    pub fn main_func() -> Func {
+    pub fn new() -> Func {
         Func {
             arity: 0,
+            slots: 0,
             code: Vec::new(),
-            name: "$main".to_string(),
         }
     }
 }

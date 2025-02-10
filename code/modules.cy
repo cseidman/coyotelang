@@ -1,15 +1,6 @@
-use math
-// There should be the following functions:
-// add(x,y)
-// mul(x,y)
+func Add(x, y)
+    print x+y
+endfunc
 
-let a = 5
-let b = 6
+Add(4,5)
 
-print math.add(a, b)
-print math.mul(a, b)
-
-/*
-11
-30
-*/

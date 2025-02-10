@@ -14,9 +14,9 @@ pub enum Instruction {
     Print = 10,
     Neg = 11,
     Const = 12,
-    Newarray = 13,
+    NewArray = 13,
     Load = 14,
-    SPool = 15,
+    SPush = 15,
     Index = 16,
     AStore = 17,
 
@@ -43,10 +43,11 @@ pub enum Instruction {
 
     Call = 35,
     Return = 36,
+    BPush = 37,
 }
 
 impl Instruction {
-    pub const INSTRUCTIONS: [&'static str; 37] = [
+    pub const INSTRUCTIONS: [&'static str; 38] = [
         "halt",     // 0
         "push",     // 1
         "add",      // 2
@@ -62,7 +63,7 @@ impl Instruction {
         "const",    // 12
         "newarray", // 13
         "load",     // 14
-        "spool",    // 15
+        "spush",    // 15
         "index",    // 16
         "astore",   // 17
         "if",       // 18
@@ -84,6 +85,7 @@ impl Instruction {
         "nop",      // 34
         "call",     // 35
         "return",   // 36
+        "bpush",    // 37
     ];
 
     /// Return the human-readable name of this instruction.
@@ -107,9 +109,9 @@ impl Instruction {
             10 => Instruction::Print,
             11 => Instruction::Neg,
             12 => Instruction::Const,
-            13 => Instruction::Newarray,
+            13 => Instruction::NewArray,
             14 => Instruction::Load,
-            15 => Instruction::SPool,
+            15 => Instruction::SPush,
             16 => Instruction::Index,
             17 => Instruction::AStore,
             18 => Instruction::If,
@@ -133,6 +135,7 @@ impl Instruction {
             34 => Instruction::Nop,
             35 => Instruction::Call,
             36 => Instruction::Return,
+            37 => Instruction::BPush,
             _ => {
                 panic!("Unknown opcode {}", opcode);
             }
@@ -154,9 +157,9 @@ impl Instruction {
             "print" => Some(Instruction::Print),
             "neg" => Some(Instruction::Neg),
             "const" => Some(Instruction::Const),
-            "newarray" => Some(Instruction::Newarray),
+            "newarray" => Some(Instruction::NewArray),
             "load" => Some(Instruction::Load),
-            "spool" => Some(Instruction::SPool),
+            "spush" => Some(Instruction::SPush),
             "index" => Some(Instruction::Index),
             "astore" => Some(Instruction::AStore),
             "if" => Some(Instruction::If),
@@ -178,6 +181,7 @@ impl Instruction {
             "nop" => Some(Instruction::Nop),
             "call" => Some(Instruction::Call),
             "return" => Some(Instruction::Return),
+            "bpush" => Some(Instruction::BPush),
             _ => None,
         }
     }

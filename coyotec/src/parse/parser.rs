@@ -21,6 +21,7 @@ use crate::{tokens, Deferable};
 
 const PREVIOUS: usize = 0;
 const CURRENT: usize = 1;
+
 #[derive(Clone)]
 pub struct Parser {
     pub source_code: String,
@@ -124,12 +125,12 @@ impl Parser {
                 // Create the identifier node
                 Node::new(NodeType::Ident(Box::from(name)), self.current_token())
             } else {
-                return Err(anyhow!("Expected identifier after `let`"));
+                return Err(anyhow!("Expected identifier"));
             };
             self.advance();
             Ok(node)
         } else {
-            Err(anyhow!("Expected identifier after `let`"))
+            Err(anyhow!("Expected identifier"))
         }
     }
 
@@ -149,8 +150,15 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Node> {
-        let node = Node::new(NodeType::Root, None);
-        self.parse_to_node(node)
+        let mut node = Node::new(NodeType::Root, None);
+        // The top level function
+        let mut main_func = Node::new(Function(Box::new("main".to_string())), None);
+
+        let code_block = Node::new(NodeType::CodeBlock, None);
+        let res = self.parse_to_node(code_block.clone())?;
+        main_func.add_child(res);
+        node.add_child(main_func);
+        Ok(node)
     }
 
     pub fn parse_to_node(&mut self, node: Node) -> Result<Node> {
@@ -169,6 +177,60 @@ impl Parser {
                     let mut print_node = Node::new(NodeType::Print, Some(token));
                     print_node.add_child(expr);
                     node.add_child(print_node);
+                    continue;
+                }
+
+                Func => {
+                    self.advance();
+
+                    let func_name = if let TokenType::Identifier(name) =
+                        self.current_token().unwrap().token_type
+                    {
+                        name
+                    } else {
+                        return Err(anyhow!("Expected function name"));
+                    };
+
+                    let mut func_node =
+                        Node::new(NodeType::Function(Box::new(func_name)), Some(token));
+
+                    self.advance();
+                    self.expect_token(TokenType::LParen)?;
+                    let mut params_node = Node::new(NodeType::Params, None);
+
+                    while let Some(tok) = self.advance() {
+                        match tok.token_type {
+                            RParen => {
+                                self.expect_token(TokenType::Newline)?;
+                                break;
+                            }
+                            Comma => {
+                                continue;
+                            }
+                            TokenType::Identifier(name) => {
+                                let param_ident = Node::new(
+                                    NodeType::Ident(Box::from(name)),
+                                    self.current_token(),
+                                );
+                                params_node.add_child(param_ident);
+                            }
+                            _ => {
+                                panic!("Unexpected token type");
+                            }
+                        }
+                    }
+                    func_node.add_child(params_node);
+                    let mut code_block = Node::new(NodeType::CodeBlock, None);
+                    let res = self.parse_to_node(code_block.clone())?;
+                    func_node.add_child(res);
+                    node.add_child(func_node);
+                }
+                EndFunc => {
+                    self.advance();
+                    return Ok(node);
+                }
+                Return => {
+                    self.advance();
                     continue;
                 }
 
@@ -254,7 +316,6 @@ impl Parser {
 
                     node.add_child(while_node);
                 }
-
                 TokenType::For => {
                     self.advance();
                     // The root node for the FOR clause
@@ -401,6 +462,17 @@ impl Parser {
                 self.advance();
                 Ok(Node::new(NodeType::Integer(value), Some(token.clone())))
             }
+
+            TokenType::True => {
+                self.advance();
+                Ok(Node::new(NodeType::Boolean(true), Some(token.clone())))
+            }
+
+            TokenType::False => {
+                self.advance();
+                Ok(Node::new(NodeType::Boolean(false), Some(token.clone())))
+            }
+
             TokenType::Boolean(value) => {
                 self.advance();
                 Ok(Node::new(NodeType::Boolean(value), Some(token.clone())))
@@ -420,7 +492,7 @@ impl Parser {
                 self.advance();
 
                 let var_name = Box::new(name.to_string());
-                let mut node = Node::new(Ident(var_name), self.current_token());
+                let mut node = Node::new(Ident(var_name.clone()), self.current_token());
                 // Check if this is an array
                 if self.match_token(TokenType::LBracket) {
                     let mut element_node = Node::new(NodeType::ArrayElement, self.current_token());
@@ -431,6 +503,22 @@ impl Parser {
                     }
                     node.add_child(element_node);
                     self.expect_token(RBracket)?;
+                }
+                // Function or method call
+                if self.match_token(TokenType::LParen) {
+                    // We don't want to treat this as a variable anymore, so
+                    // we're going to change the `ident` node as a new `call` node
+
+                    // redefine the original ident to make it a call node
+                    node.node_type = NodeType::Call(var_name);
+                    // Get the parameters
+                    while let Ok(expr) = self.parse_expr(0) {
+                        node.add_child(expr);
+                        if self.match_token(TokenType::Comma) {
+                            continue;
+                        }
+                    }
+                    self.expect_token(RParen)?;
                 }
 
                 Ok(node)

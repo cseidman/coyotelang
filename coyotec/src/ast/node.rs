@@ -65,7 +65,8 @@ pub enum NodeType {
     Array,
     UnaryOp(UnOp),
     BinaryOp(BinOp),
-    Function(Box<Vec<NodeType>>),
+    Function(Box<String>),
+    Params,
     Assignment,
     // IF can be an expression as well
     If,
@@ -93,6 +94,7 @@ pub enum NodeType {
     ArrayElement,
 
     Range,
+    Call(Box<String>),
 }
 
 impl Display for NodeType {
@@ -125,6 +127,7 @@ impl Display for NodeType {
             NodeType::BinaryOp(BinOp::NotEqual) => write!(f, "neq"),
 
             NodeType::Function(_) => write!(f, "function"),
+            NodeType::Params => write!(f, "params"),
             NodeType::Assignment => write!(f, "assignment"),
             NodeType::Let => write!(f, "let"),
             NodeType::Print => write!(f, "print"),
@@ -149,6 +152,7 @@ impl Display for NodeType {
             NodeType::ArrayElement => write!(f, "arrayelement"),
 
             NodeType::Range => write!(f, "range"),
+            NodeType::Call(_) => write!(f, "call"),
         }
     }
 }

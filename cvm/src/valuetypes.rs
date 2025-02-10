@@ -9,18 +9,15 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 #[repr(u8)]
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum DataTag {
-    Nil = 0,
-    Float = 1,
-    Bool = 2,
-    Pointer = 3,
-    Char = 4,
-    Integer = 5,
-    Byte = 6,
-    UInt = 7,
-    Text = 8,
-    ConstText = 9,
-    Array = 10,
-    FuncPtr = 11,
+    Nil = 0x00,
+    Float = 0x01,
+    Bool = 0x02,
+    Char = 0x04,
+    Integer = 0x05,
+    Byte = 0x06,
+    UInt = 0x07,
+    Text = 0x08,
+    Array = 0x0A,
 }
 
 impl From<u8> for DataTag {
@@ -29,15 +26,12 @@ impl From<u8> for DataTag {
             0 => DataTag::Nil,
             1 => DataTag::Float,
             2 => DataTag::Bool,
-            3 => DataTag::Pointer,
             4 => DataTag::Char,
             5 => DataTag::Integer,
             6 => DataTag::Byte,
             7 => DataTag::UInt,
             8 => DataTag::Text,
-            9 => DataTag::ConstText,
             10 => DataTag::Array,
-            11 => DataTag::FuncPtr,
             _ => {
                 panic!("unknown tag")
             }
@@ -157,7 +151,7 @@ impl Display for Object {
                 write!(f, "{}", boxed_val)
             }
             Object::Func(val) => {
-                write!(f, "{}", val.name)
+                write!(f, "function")
             }
         }
     }

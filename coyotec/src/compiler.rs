@@ -1,4 +1,4 @@
-#![allow(unused_assignments, unused_variables)]
+#![allow(unused_assignments, unused_variables, unused_imports)]
 use crate::ast::node::display_tree;
 use crate::generator::generate;
 use crate::lexer::{lex, SourceType};

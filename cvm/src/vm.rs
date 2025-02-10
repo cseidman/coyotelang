@@ -1,4 +1,4 @@
-#![allow(dead_code, unused_macros)]
+#![allow(dead_code, unused_macros, unused_imports)]
 
 const STACK_SIZE: usize = 1_000_000;
 const GLOBAL_SIZE: usize = 1024;
@@ -11,7 +11,10 @@ use crate::{
     constants::Instruction::*,
     valuetypes::{DataTag, Object},
 };
+use colored::Colorize;
 use std::ops::Neg;
+use std::thread::sleep;
+use std::time::Duration;
 use std::usize;
 
 #[derive(Debug, Clone)]
@@ -37,28 +40,29 @@ impl StackFrame {
 pub struct Vm {
     stack: Vec<Object>,
     string_pool: Vec<String>,
+    functions: Vec<Func>,
     stack_frame: Vec<StackFrame>,
-    fp: usize,
 }
 
 impl Vm {
     pub fn new() -> Self {
         let obj = Object::Nil;
 
-        let mut s = Self {
+        let mut vm = Self {
             stack: vec![obj.clone(); STACK_SIZE],
             string_pool: Vec::new(),
-
+            functions: Vec::new(),
             stack_frame: Vec::with_capacity(FRAMES_DEPTH),
-            fp: 0,
         };
-        s.push_frame(Func::main_func());
-        s
+
+        let frame = StackFrame::new(Func::new(), 0, 0);
+        vm.stack_frame.push(frame);
+        vm
     }
 
     pub fn current_stack(&mut self) -> &mut [Object] {
-        let start_sp = self.current_frame().start_sp;
-        &mut self.stack[start_sp..]
+        let start = self.current_frame().start_sp;
+        &mut self.stack[start..]
     }
 
     pub fn add_code(&mut self, code: Vec<u8>) {
@@ -66,13 +70,11 @@ impl Vm {
     }
 
     fn current_frame(&mut self) -> &mut StackFrame {
-        let fp = self.fp;
-        &mut self.stack_frame[fp]
+        self.stack_frame.last_mut().unwrap()
     }
 
     fn incr_ip(&mut self, by: usize) {
-        let fp = self.fp;
-        self.stack_frame[fp].ip += by;
+        self.current_frame().ip += by;
     }
 
     fn current_code(&mut self) -> &[u8] {
@@ -96,15 +98,15 @@ impl Vm {
 
     fn push_frame(&mut self, function: Func) {
         // Push the current ip and sp
-        let ip = 0;
-        let sp = 0;
+        let mut ip = 0;
+        let mut sp = 0;
 
-        if self.fp > 0 {
-            let sp = self.current_frame().sp;
-            let ip = self.current_frame().ip;
+        if self.stack_frame.len() > 1 {
+            sp = self.current_frame().sp - function.arity as usize;
+            ip = self.current_frame().ip;
         }
 
-        let mut frame = StackFrame::new(function, ip, sp);
+        let frame = StackFrame::new(function, ip, sp);
         self.stack_frame.push(frame);
     }
 
@@ -137,10 +139,42 @@ impl Vm {
         f64::from_le_bytes(bytes) as usize
     }
 
+    fn get_u16(&mut self) -> u16 {
+        let ip = self.current_frame().ip;
+        let bytes: [u8; 2] = self.current_code()[ip..ip + 2].try_into().unwrap();
+
+        self.incr_ip(2);
+        u16::from_le_bytes(bytes)
+    }
+
+    fn get_u32(&mut self) -> u32 {
+        let ip = self.current_frame().ip;
+        let bytes: [u8; 4] = self.current_code()[ip..ip + 4].try_into().unwrap();
+
+        self.incr_ip(4);
+        u32::from_le_bytes(bytes)
+    }
+
+    fn get_i32(&mut self) -> i32 {
+        let ip = self.current_frame().ip;
+        let bytes: [u8; 4] = self.current_code()[ip..ip + 4].try_into().unwrap();
+
+        self.incr_ip(4);
+        i32::from_le_bytes(bytes)
+    }
+
+    fn get_f64(&mut self) -> f64 {
+        let ip = self.current_frame().ip;
+        let bytes: [u8; 8] = self.current_code()[ip..ip + 8].try_into().unwrap();
+
+        self.incr_ip(8);
+        f64::from_le_bytes(bytes)
+    }
+
     fn get_byte(&mut self) -> u8 {
         let ip = self.current_frame().ip;
         let byte = self.current_code()[ip];
-        self.incr_ip(8);
+        self.incr_ip(1);
         byte
     }
 
@@ -154,6 +188,14 @@ impl Vm {
         let sp = self.current_frame().sp;
         self.current_stack()[sp] = obj;
         self.current_frame().sp += 1;
+    }
+
+    fn get_bool(&mut self) -> Object {
+        let _tag = self.get_tag();
+        let ip = self.current_frame().ip;
+        let byte: u8 = self.current_code()[ip];
+        self.incr_ip(1);
+        Object::Bool(byte != 0)
     }
 
     fn get_const(&mut self) -> Object {
@@ -180,7 +222,7 @@ impl Vm {
 
     fn get_string(&mut self) -> Object {
         self.get_tag();
-        let index = self.get_data();
+        let index = self.get_u32() as usize;
         let value = self.string_pool[index].clone();
         Object::Str(value)
     }
@@ -188,9 +230,12 @@ impl Vm {
     /// Loads constants from the ASM file that need to go into the string pool
     fn load_string_pool(&mut self) {
         self.string_pool.clear();
-        let num_constants = u32::from_le_bytes(self.current_code()[0..4].try_into().unwrap());
+        let ip = self.current_frame().ip;
+        let chunk = &self.current_code()[ip..ip + 4];
+        let num_strings = u32::from_le_bytes(chunk.try_into().unwrap());
+
         self.incr_ip(4);
-        for _ in 0..num_constants {
+        for _ in 0..num_strings {
             let ip = self.current_frame().ip;
             let s_len =
                 u32::from_le_bytes(self.current_code()[ip..ip + 4].try_into().unwrap()) as usize;
@@ -198,28 +243,69 @@ impl Vm {
             let ip = self.current_frame().ip;
             let s_val = String::from_utf8(self.current_code()[ip..ip + s_len].to_vec()).unwrap();
             self.string_pool.push(s_val);
+
             self.incr_ip(s_len);
         }
     }
 
-    /// Read the number of constants and use that as the basis for the starting position on the
-    /// stack
-    fn load_globals(&mut self) -> usize {
-        let start = self.current_frame().ip;
-        let num_constants =
-            u32::from_le_bytes(self.current_code()[start..(start + 4)].try_into().unwrap());
-        self.incr_ip(4);
-        num_constants as usize
+    fn load_subs(&mut self) {
+        macro_rules! get_u32 {
+            () => {{
+                let start = self.current_frame().ip;
+                let num =
+                    u32::from_le_bytes(self.current_code()[start..(start + 4)].try_into().unwrap());
+                self.incr_ip(4);
+                num
+            }};
+        }
+
+        let num_subs = get_u32!();
+
+        for sub_count in 0..num_subs {
+            // We don't really need this
+            let _location = get_u32!();
+
+            let ip = self.current_frame().ip;
+
+            let arity = self.current_code()[ip] as u8;
+            self.incr_ip(1);
+
+            let ip = self.current_frame().ip;
+            let slots = self.current_code()[ip] as u8;
+
+            self.incr_ip(1);
+            let code_length = get_u32!() as usize;
+
+            let start = self.current_frame().ip;
+            let code = self.current_code()[start..(start + code_length)].to_vec();
+            self.incr_ip(code_length);
+
+            let func = Func { arity, slots, code };
+            self.functions.push(func);
+        }
     }
 
     pub fn run(&mut self) {
+        self.load_subs();
         self.load_string_pool();
-        self.load_globals();
-        // Clear out the bytes we already used and restart at 0
+
         let ip = self.current_frame().ip;
         self.current_frame().function.code.drain(..ip);
+
+        self.stack_frame.push(StackFrame {
+            function: self.functions[0].clone(),
+            ip: 0,
+            start_sp: 0,
+            sp: 0,
+        });
+
+        let offset = self.current_frame().function.slots as usize;
+
+        // Clear out the bytes we already used and restart at 0
+
         self.current_frame().ip = 0;
-        self.current_frame().sp = 1024;
+        self.current_frame().start_sp += offset;
+        self.current_frame().sp += offset;
 
         macro_rules! binop {
             ($op:tt) => {
@@ -263,20 +349,34 @@ impl Vm {
                 let mut ip = self.current_frame().ip;
                 let b = self.current_code()[ip] as u8;
                 let instr = Instruction::from_u8(b);
-                print!("{:05}: {:<10} ", ip, instr.as_str());
+                print!("{:05}: {:<10} ", ip, instr.as_str().yellow());
                 match instr {
-                    Push | Store | Load | Jmp | Newarray | SPool | Set | Index => {
+                    Push => {
                         ip = ip + 2;
                         let bytes: [u8; 8] = self.current_code()[ip..ip + 8].try_into().unwrap();
                         //print!("bytes: {:?}", bytes);
                         let opd = f64::from_le_bytes(bytes) as usize;
-                        print!("{:<6} |", opd);
+                        print!("{:<6} |", opd.to_string().cyan());
                     }
-                    JmpFalse => {
+                    SPush => {
                         ip = ip + 2;
-                        let bytes: [u8; 8] = self.current_code()[ip..ip + 8].try_into().unwrap();
-                        let opd = f64::from_le_bytes(bytes) as usize;
-                        print!("{:<6} |", opd);
+                        let bytes: [u8; 4] = self.current_code()[ip..ip + 4].try_into().unwrap();
+
+                        let opd = u32::from_le_bytes(bytes) as usize;
+                        print!("{:<6} |", opd.to_string().cyan());
+                    }
+                    Store | Load | NewArray | Set | Index => {
+                        ip = ip + 1;
+                        let bytes: [u8; 2] = self.current_code()[ip..ip + 2].try_into().unwrap();
+
+                        let opd = u16::from_le_bytes(bytes) as usize;
+                        print!("{:<6} |", opd.to_string().cyan());
+                    }
+                    JmpFalse | Jmp => {
+                        ip = ip + 1;
+                        let bytes: [u8; 4] = self.current_code()[ip..ip + 4].try_into().unwrap();
+                        let opd = i32::from_le_bytes(bytes) as usize;
+                        print!("{:<6} |", opd.to_string().cyan());
                     }
                     _ => {
                         print!("{:<6} |", "");
@@ -287,15 +387,15 @@ impl Vm {
 
         macro_rules! display_stack {
             () => {
-                print!(" -> [ ");
-                for sp in 0..10 {
-                    //let obj = self.stack[sp].clone();
-                    let obj = self.current_stack()[sp].clone();
-                    if obj != Object::Nil {
-                        print!("{obj} ")
+                let sp = self.current_frame().sp;
+                print!("{}", "-> [ ".green());
+                for idx in (offset..sp).rev() {
+                    let obj = &self.current_stack()[idx];
+                    if *obj != Object::Nil {
+                        print!("{} ", obj.to_string().bright_yellow());
                     }
                 }
-                println!("]");
+                println!("{}", "]".green());
             };
         }
 
@@ -303,32 +403,28 @@ impl Vm {
             //vm_debug!();
             let b = self.get_instruction();
 
-            //sleep(Duration::from_millis(500));
+            sleep(Duration::from_millis(100));
             match b {
                 Push => {
                     let obj = self.get_const();
                     self.push(obj);
                 }
 
-                SPool => {
+                SPush => {
                     let obj = self.get_string();
                     self.push(obj)
                 }
 
+                BPush => {
+                    let obj = self.get_bool();
+                    self.push(obj)
+                }
+
                 Call => {
-                    // Get the function object off the stack
-                    let func_obj = self.pop();
-                    let func = if let Object::Func(func_obj) = func_obj {
-                        self.push_frame(*func_obj);
-                    } else {
-                        panic!("Not a function");
-                    };
-
-                    // Position the pointer where the parameters were left on the stack
-                    let fp = self.fp;
-                    //self.stack_frame[fp].sp -= func.arity;
-
-                    self.pop_frame();
+                    // Get the function object off the function registry
+                    let index = self.get_u16() as usize;
+                    let func = &self.functions[index];
+                    self.push_frame(func.clone());
                 }
 
                 Return => {
@@ -375,18 +471,13 @@ impl Vm {
                     cmpop!(<=);
                 }
 
-                Set => {
-                    let slot = self.get_operand();
-                    self.current_stack()[slot as usize] = self.pop();
-                }
-
                 Neg => {
                     let obj = self.pop();
                     self.push(obj.neg());
                 }
 
-                Newarray => {
-                    let element_count = self.get_operand();
+                NewArray => {
+                    let element_count = self.get_u16() as usize;
                     // Create the table as an array
                     let mut arr = Table::<Object>::new();
 
@@ -402,7 +493,7 @@ impl Vm {
 
                 AStore => {
                     // Get the element index
-                    let idx = if let Object::Integer(int) = self.pop() {
+                    let idx = if let Object::Float(int) = self.pop() {
                         int as usize
                     } else {
                         panic!("not an integer");
@@ -411,7 +502,7 @@ impl Vm {
                     let value = self.pop().clone();
 
                     // Index array object
-                    let array_location = self.get_operand();
+                    let array_location = self.get_u16() as usize;
                     let obj_array = self
                         .current_stack()
                         .get_mut(array_location as usize)
@@ -428,7 +519,7 @@ impl Vm {
                 }
 
                 Store => {
-                    let slot = self.get_integer();
+                    let slot = self.get_u16();
                     let obj = self.pop();
                     match obj {
                         _ => {
@@ -438,16 +529,16 @@ impl Vm {
                 }
 
                 Load => {
-                    let slot = self.get_integer();
-                    let obj = self.current_stack()[slot].clone();
+                    let slot = self.get_u16();
+                    let obj = self.current_stack()[slot as usize].clone();
                     self.push(obj);
                 }
                 Jmp => {
-                    let new_loc = self.get_operand();
+                    let new_loc = self.get_i32() as usize;
                     self.current_frame().ip = new_loc;
                 }
                 JmpFalse => {
-                    let new_loc = self.get_operand();
+                    let new_loc = self.get_i32() as usize;
                     let obj = self.pop();
                     if let Object::Bool(b) = obj {
                         if !b {
@@ -460,14 +551,14 @@ impl Vm {
                 Index => {
                     // Get the index expression
                     // index
-                    let index = if let Object::Integer(int) = self.pop() {
+                    let index = if let Object::Float(int) = self.pop() {
                         int as usize
                     } else {
                         panic!("not an integer");
                     };
 
                     // Get the array
-                    let slot = self.get_operand();
+                    let slot = self.get_u16() as usize;
                     let obj = self.current_stack()[slot].clone();
 
                     if let Object::Array(table) = obj {
@@ -501,6 +592,16 @@ impl Vm {
                     break;
                 }
             }
+            /*
+            println!("WHOLE STACK");
+            for idx in 0..self.stack.len() - 1 {
+                let obj = &self.stack[idx];
+                if *obj != Object::Nil {
+                    println!("{idx}: {obj} ");
+                }
+            }
+            println!("------------");
+            */
             //display_stack!();
         }
         println!();

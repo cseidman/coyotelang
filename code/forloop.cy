@@ -14,3 +14,12 @@ for i in 1 to 3
         print j
     endfor
 endfor
+
+/*
+1
+12
+13
+2
+12
+13
+*/

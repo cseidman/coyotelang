@@ -171,7 +171,6 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
             let tok = match ident.as_str() {
                 // Statements
                 "let" => lexer.make_token(TokenType::Let),
-                "func" => lexer.make_token(TokenType::Func),
                 "print" => lexer.make_token(TokenType::Print),
                 "if" => lexer.make_token(TokenType::If),
                 "else" => lexer.make_token(TokenType::Else),
@@ -191,6 +190,11 @@ pub fn lex(code: &str, source_type: SourceType) -> Result<Vec<Token>> {
 
                 "module" => lexer.make_token(TokenType::Module),
                 "use" => lexer.make_token(TokenType::Use),
+                "func" => lexer.make_token(TokenType::Func),
+                "endfunc" => lexer.make_token(TokenType::EndFunc),
+                "return" => lexer.make_token(TokenType::Return),
+                "true" => lexer.make_token(TokenType::True),
+                "false" => lexer.make_token(TokenType::False),
                 // And if all else fails: identifier
                 _ => lexer.make_token(TokenType::Identifier(ident)),
             };
